@@ -1,0 +1,170 @@
+﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration.Binder;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using NLog;
+using Ocdt.DataStoreServices;
+using Ocdt.DomainModel;
+
+namespace OCDT_Notifier {
+    public class OCDTNotifier : OcdtToolBase {
+        /// <summary>
+        /// The logger.
+        /// </summary>
+        protected static new readonly Logger Logger = LogManager.GetCurrentClassLogger ();
+
+        /// <summary>
+        /// The configuration, as specified by the user.
+        /// </summary>
+        public static Configuration configuration = new Configuration ();
+
+        protected MattermostTarget target;
+
+        /// <summary>
+        /// The list of OCDT engineering models
+        /// </summary>
+        List<EngineeringModelSetup> engineeringModelSetups;
+
+        /// <summary>
+        /// List of the latest checked revisions for all OCDT things
+        /// </summary>
+        private Dictionary<Guid, int> allRevisions = new Dictionary<Guid, int> ();
+
+        /// <summary>
+        /// The list of the latest parsed revision for every Engineering Model
+        /// </summary>
+        private Dictionary<Guid, int> modelRevisions = new Dictionary<Guid, int> ();
+
+        public OCDTNotifier ()
+        {
+            // Log onto the communications platform
+            target = new MattermostTarget ();
+
+            Logger.Info ("Connecting to OCDT...");
+
+            OpenSession (configuration.Server.Url, configuration.Server.Username, configuration.Server.Password);
+            engineeringModelSetups = GetEngineeringModelSetups (configuration.Fetch.Models);
+
+            foreach (var engineeringModelSetup in engineeringModelSetups) {
+                initialPoll (engineeringModelSetup);
+            }
+
+            while (true) {
+                foreach (var engineeringModelSetup in engineeringModelSetups) {
+                    poll (engineeringModelSetup);
+                }
+
+                // Sleep until the next reading time
+                var interval = (int)(configuration.Fetch.Interval * 1000);
+                Logger.Trace ("Sleeping for {} ms", interval);
+                System.Threading.Thread.Sleep (interval);
+            }
+        }
+
+        /// <summary>
+        /// Perform the first poll on the model, so as to get all the reference
+        /// data and load the revisions without notifying the target.
+        /// </summary>
+        /// <param name="engineeringModelSetup">Engineering model setup.</param>
+        private void initialPoll (EngineeringModelSetup engineeringModelSetup)
+        {
+            Logger.Debug ("Found EngineeringModelSetup {}", engineeringModelSetup.Name);
+            var engineeringModel = new EngineeringModel (iid: engineeringModelSetup.EngineeringModelIid);
+            var iteration = new Iteration (iid: engineeringModelSetup.LastIterationSetup.IterationIid);
+            engineeringModel.Iteration.Add (iteration);
+
+            var queryParameters = new QueryParameters {
+                Extent = ExtentQueryParameterKind.DEEP,
+                IncludeAllContainers = true,
+                // Make sure we include the large reference data for our first
+                // read.
+                IncludeReferenceData = true
+            };
+
+            // Perform the read
+            var domainObjectStoreChange = WebServiceClient.Read (iteration, queryParameters);
+
+            if (domainObjectStoreChange != null) {
+                // For every Thing...
+                foreach (var changedDomainObject in domainObjectStoreChange.ChangedDomainObjects) {
+                    var thing = changedDomainObject.Key;
+
+                    if (!allRevisions.ContainsKey (thing.Iid)) {
+                        // Add the thing's revision to the revision list
+                        allRevisions [thing.Iid] = thing.RevisionNumber;
+                    }
+                }
+            }
+        }
+
+        private void poll (EngineeringModelSetup engineeringModelSetup)
+        {
+            Logger.Debug ("Querying EngineeringModelSetup {}", engineeringModelSetup.Name);
+            var engineeringModel = new EngineeringModel (iid: engineeringModelSetup.EngineeringModelIid);
+            var iteration = new Iteration (iid: engineeringModelSetup.LastIterationSetup.IterationIid);
+            engineeringModel.Iteration.Add (iteration);
+
+            var queryParameters = new QueryParameters {
+                Extent = ExtentQueryParameterKind.DEEP,
+                IncludeAllContainers = true,
+                IncludeReferenceData = false
+            };
+
+            try {
+                var domainObjectStoreChange = WebServiceClient.Read (iteration, queryParameters);
+
+                Logger.Debug (
+                    "Read result contains {0} changed domain object(s)",
+                    domainObjectStoreChange == null ? 0 : domainObjectStoreChange.ChangedDomainObjects.Count);
+
+                if (domainObjectStoreChange != null) {
+                    foreach (var changedDomainObject in domainObjectStoreChange.ChangedDomainObjects) {
+                        var thing = changedDomainObject.Key;
+
+                        if (!allRevisions.ContainsKey (thing.Iid)) {
+                            Logger.Warn ("New thing {}", thing);
+                            target.NotifyOther (thing);
+                            allRevisions [thing.Iid] = thing.RevisionNumber;
+                        } else if (allRevisions [thing.Iid] != thing.RevisionNumber) {
+                            Logger.Warn ("New update for {}", thing);
+                            allRevisions [thing.Iid] = thing.RevisionNumber;
+
+                            switch (thing.ClassKind) {
+                            case ClassKind.ParameterValueSet:
+                                Logger.Info ("Detected parameter value change");
+                                target.NotifyParameterValueSet ((ParameterValueSet)thing);
+                                break;
+                            case ClassKind.EngineeringModel:
+                                break;
+                            default:
+                                target.NotifyOther (thing);
+                                break;
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                Logger.Error (e, "EngineeringModel was not read successfulsly: {}", e);
+                return;
+            }
+        }
+
+        public static void Main (string [] args)
+        {
+            Console.WriteLine ("Welcome to OCDT Notifier");
+
+            var root = new ConfigurationBuilder ()
+                .SetBasePath (System.IO.Directory.GetCurrentDirectory ())
+                .AddYamlFile ("config.yml")
+                .Build ();
+            root.Bind ("ocdt_notifier", configuration);
+
+            Logger.Debug ("Loaded configuration: {}", new YamlDotNet.Serialization.Serializer ().Serialize (configuration));
+
+            new OCDTNotifier ();
+        }
+
+
+    }
+}

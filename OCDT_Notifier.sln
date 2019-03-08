@@ -1,0 +1,28 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OCDT_Notifier", "OCDT_Notifier\OCDT_Notifier.csproj", "{3438EBB3-44A3-490C-B8B6-6FBD8D7AAFCA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MessageServices", "MessageServices\MessageServices.csproj", "{94FBD09B-FBBC-48FF-9B5D-A7A67BA69DED}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{B2F796EF-8C75-4283-8B17-375B8ADA1380}"
+	ProjectSection(SolutionItems) = preProject
+		GlobalAssembly.cs = GlobalAssembly.cs
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x86 = Debug|x86
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3438EBB3-44A3-490C-B8B6-6FBD8D7AAFCA}.Debug|x86.ActiveCfg = Debug|x86
+		{3438EBB3-44A3-490C-B8B6-6FBD8D7AAFCA}.Debug|x86.Build.0 = Debug|x86
+		{3438EBB3-44A3-490C-B8B6-6FBD8D7AAFCA}.Release|x86.ActiveCfg = Release|x86
+		{3438EBB3-44A3-490C-B8B6-6FBD8D7AAFCA}.Release|x86.Build.0 = Release|x86
+		{94FBD09B-FBBC-48FF-9B5D-A7A67BA69DED}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{94FBD09B-FBBC-48FF-9B5D-A7A67BA69DED}.Debug|x86.Build.0 = Debug|Any CPU
+		{94FBD09B-FBBC-48FF-9B5D-A7A67BA69DED}.Release|x86.ActiveCfg = Release|Any CPU
+		{94FBD09B-FBBC-48FF-9B5D-A7A67BA69DED}.Release|x86.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
