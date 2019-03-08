@@ -6,6 +6,8 @@ using System.Linq;
 using NLog;
 using Ocdt.DataStoreServices;
 using Ocdt.DomainModel;
+using System.Xml.Serialization;
+using System.IO;
 
 namespace OCDT_Notifier {
     public class OCDTNotifier : OcdtToolBase {
@@ -74,9 +76,6 @@ namespace OCDT_Notifier {
             var iteration = new Iteration (iid: engineeringModelSetup.LastIterationSetup.IterationIid);
             engineeringModel.Iteration.Add (iteration);
 
-            // Get the last revision of the engineering model
-            modelRevisions [engineeringModel.Iid] = iteration.RevisionNumber;
-
             var queryParameters = new QueryParameters {
                 Extent = ExtentQueryParameterKind.DEEP,
                 IncludeAllContainers = true,
@@ -85,7 +84,7 @@ namespace OCDT_Notifier {
                 IncludeReferenceData = true
             };
 
-            // Perform the read
+            // Read the iteration
             var domainObjectStoreChange = WebServiceClient.Read (iteration, queryParameters);
 
             if (domainObjectStoreChange != null) {
@@ -97,20 +96,20 @@ namespace OCDT_Notifier {
                     allRevisions [thing.Iid] = thing.RevisionNumber;
                 }
             }
+
+            // Read the engineering model
+            WebServiceClient.Read (engineeringModel);
+            engineeringModel = (EngineeringModel)ObjStore.GetByIid (iid: engineeringModel.Iid);
+            Logger.Trace ("Loaded EM {} with revision {} (setup revision {})", engineeringModelSetup.ShortName, engineeringModel.RevisionNumber, engineeringModelSetup.RevisionNumber);
+            modelRevisions [engineeringModel.Iid] = engineeringModel.RevisionNumber;
         }
 
         private void poll (EngineeringModelSetup engineeringModelSetup)
         {
             Logger.Debug ("Querying EngineeringModelSetup {}", engineeringModelSetup.Name);
-            var engineeringModel = new EngineeringModel (iid: engineeringModelSetup.EngineeringModelIid);
+            var engineeringModel = (EngineeringModel)ObjStore.GetByIid (iid: engineeringModelSetup.EngineeringModelIid);
             var iteration = new Iteration (iid: engineeringModelSetup.LastIterationSetup.IterationIid);
             engineeringModel.Iteration.Add (iteration);
-
-            //// Find if we have a new revision
-            //if (iteration.RevisionNumber == modelRevisions[engineeringModel.Iid]) {
-            //    Logger.Debug ("No new data found for {}", engineeringModelSetup.ShortName);
-            //    return;
-            //}
 
             var queryParameters = new QueryParameters {
                 Extent = ExtentQueryParameterKind.DEEP,
@@ -119,14 +118,11 @@ namespace OCDT_Notifier {
                 RevisionNumber = modelRevisions[engineeringModel.Iid]
             };
 
-            // Update the revision so we don't get old models
-            modelRevisions [engineeringModel.Iid] = iteration.RevisionNumber;
-
             try {
                 var domainObjectStoreChange = WebServiceClient.Read (iteration, queryParameters);
 
                 Logger.Debug (
-                    "Read result contains {0} changed domain object(s)",
+                    "Read result contains {0} changed domain objects",
                     domainObjectStoreChange == null ? 0 : domainObjectStoreChange.ChangedDomainObjects.Count);
 
                 if (domainObjectStoreChange != null) {
@@ -156,6 +152,10 @@ namespace OCDT_Notifier {
                         }
                     }
                 }
+
+                // Update the revision so we don't get old models
+                Logger.Trace ("Updating model revision {} -> {}", modelRevisions [engineeringModel.Iid], engineeringModel.RevisionNumber);
+                modelRevisions [engineeringModel.Iid] = engineeringModel.RevisionNumber;
             } catch (Exception e) {
                 Logger.Error (e, "EngineeringModel was not read successfulsly: {}", e);
                 return;
