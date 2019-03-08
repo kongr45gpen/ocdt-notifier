@@ -74,6 +74,9 @@ namespace OCDT_Notifier {
             var iteration = new Iteration (iid: engineeringModelSetup.LastIterationSetup.IterationIid);
             engineeringModel.Iteration.Add (iteration);
 
+            // Get the last revision of the engineering model
+            modelRevisions [engineeringModel.Iid] = iteration.RevisionNumber;
+
             var queryParameters = new QueryParameters {
                 Extent = ExtentQueryParameterKind.DEEP,
                 IncludeAllContainers = true,
@@ -90,10 +93,8 @@ namespace OCDT_Notifier {
                 foreach (var changedDomainObject in domainObjectStoreChange.ChangedDomainObjects) {
                     var thing = changedDomainObject.Key;
 
-                    if (!allRevisions.ContainsKey (thing.Iid)) {
-                        // Add the thing's revision to the revision list
-                        allRevisions [thing.Iid] = thing.RevisionNumber;
-                    }
+                    // Add the thing's revision to the revision list
+                    allRevisions [thing.Iid] = thing.RevisionNumber;
                 }
             }
         }
@@ -105,11 +106,21 @@ namespace OCDT_Notifier {
             var iteration = new Iteration (iid: engineeringModelSetup.LastIterationSetup.IterationIid);
             engineeringModel.Iteration.Add (iteration);
 
+            //// Find if we have a new revision
+            //if (iteration.RevisionNumber == modelRevisions[engineeringModel.Iid]) {
+            //    Logger.Debug ("No new data found for {}", engineeringModelSetup.ShortName);
+            //    return;
+            //}
+
             var queryParameters = new QueryParameters {
                 Extent = ExtentQueryParameterKind.DEEP,
                 IncludeAllContainers = true,
-                IncludeReferenceData = false
+                IncludeReferenceData = false,
+                RevisionNumber = modelRevisions[engineeringModel.Iid]
             };
+
+            // Update the revision so we don't get old models
+            modelRevisions [engineeringModel.Iid] = iteration.RevisionNumber;
 
             try {
                 var domainObjectStoreChange = WebServiceClient.Read (iteration, queryParameters);
@@ -120,7 +131,8 @@ namespace OCDT_Notifier {
 
                 if (domainObjectStoreChange != null) {
                     foreach (var changedDomainObject in domainObjectStoreChange.ChangedDomainObjects) {
-                        var thing = changedDomainObject.Key;
+                        ChangeKind updateType = changedDomainObject.Value;
+                        Thing thing = changedDomainObject.Key;
 
                         if (!allRevisions.ContainsKey (thing.Iid)) {
                             Logger.Warn ("New thing {}", thing);
