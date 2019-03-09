@@ -18,7 +18,7 @@ namespace OCDT_Notifier
             EngineeringModelSetup engineeringModelSetup = parameterValueSets [0].ContainerParameter.ContainerElementDefinition.ContainerIteration.ContainerEngineeringModel.EngineeringModelSetup;
 
             // We assume the list is not empty
-            var text = String.Format ("#### {0} {1} – Parameter values", FormatClassKind(ParameterValueSet), engineeringModelSetup.Name);
+            var text = String.Format ("#### {0} {1} – Parameter values\n", FormatClassKind(ClassKind.ParameterValueSet), engineeringModelSetup.Name);
             text += "|Domain|Type| Equipment | Parameter | New value | Published |\n|:---:|:---:|-----|------|:----:|:----:|\n";
 
             foreach (ParameterValueSet parameterValueSet in parameterValueSets) {
