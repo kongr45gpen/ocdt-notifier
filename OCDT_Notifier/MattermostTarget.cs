@@ -15,8 +15,11 @@ namespace OCDT_Notifier
 
         public void NotifyParameterValueSet(List<ParameterValueSet> parameterValueSets, Dictionary<Guid, Tuple<ChangeKind>> metadata)
         {
+            EngineeringModelSetup engineeringModelSetup = parameterValueSets [0].ContainerParameter.ContainerElementDefinition.ContainerIteration.ContainerEngineeringModel.EngineeringModelSetup;
+
             // We assume the list is not empty
-            var text = "|Type| Equipment | Parameter | Published | New value |\n|:---:|-----|------|:----:|:----:|\n";
+            var text = String.Format ("#### {0} – Parameter values", engineeringModelSetup.Name);
+            text += "|Domain|Type| Equipment | Parameter | New value | Published |\n|:---:|:---:|-----|------|:----:|:----:|\n";
 
             foreach (ParameterValueSet parameterValueSet in parameterValueSets) {
                 ChangeKind changeKind = metadata [parameterValueSet.Iid].Item1;
@@ -25,24 +28,15 @@ namespace OCDT_Notifier
                 Logger.Trace ("Param Owner: {}", parameterValueSet.DeriveOwner ());
                 Logger.Trace ("Param Element: {}", parameterValueSet.ContainerParameter.ContainerElementDefinition);
 
-                text += String.Format ("|{0}|{1}|{2}|{3} {4}|**{5}** {4}|\n",
+                text += String.Format ("|{0}|{1}|{2}|{3}|**{4}** {5}|{6} {5}|\n",
+                    parameterValueSet.DeriveOwner().ShortName,
                     FormatChangeKind(changeKind),
                     parameterValueSet.ContainerParameter.ContainerElementDefinition.Name + " (" + parameterValueSet.ContainerParameter.ContainerElementDefinition.ShortName + ")",
                     parameterValueSet.ContainerParameter.ParameterType.Name,
-                    parameterValueSet.Published[0],
+                    parameterValueSet.ActualValue [0],
                     parameterValueSet.DeriveMeasurementScale () != null ? parameterValueSet.DeriveMeasurementScale ().ShortName : "",
-                    parameterValueSet.ActualValue[0]
+                    parameterValueSet.Published[0]
                     );
-
-                //var text = String.Format ("##### {0} Parameter value change\n- Equipment: **{1}** - {2}\n- New value: **{3}** {4} ({5})\n- Published (old) value: {6}",
-                    //parameterValueSet.DeriveOwner ().ShortName,
-                    //parameterValueSet.ContainerParameter.ContainerElementDefinition.Name + " (" + parameterValueSet.ContainerParameter.ContainerElementDefinition.ShortName + ")",
-                    //parameterValueSet.ContainerParameter.ParameterType.Name,
-                    //parameterValueSet.ActualValue [0],
-                    //parameterValueSet.DeriveMeasurementScale () != null ? parameterValueSet.DeriveMeasurementScale ().ShortName : "",
-                    //parameterValueSet.ValueSwitch.ToString (),
-                    //parameterValueSet.Published [0]
-                    //);
 
                 SendMessage (text);
             }
