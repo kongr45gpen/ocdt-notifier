@@ -13,17 +13,20 @@ namespace OCDT_Notifier
 
         protected Uri hook;
 
-        public void NotifyParameterValueSet(List<ParameterValueSet> parameterValueSets)
+        public void NotifyParameterValueSet(List<ParameterValueSet> parameterValueSets, Dictionary<Guid, Tuple<ChangeKind>> metadata)
         {
             // We assume the list is not empty
-            var text = "| Equipment | Parameter | Published | New value |\n| ----- |------|:----:|:----:|\n";
+            var text = "|Type| Equipment | Parameter | Published | New value |\n|:---:|-----|------|:----:|:----:|\n";
 
             foreach (ParameterValueSet parameterValueSet in parameterValueSets) {
+                ChangeKind changeKind = metadata [parameterValueSet.Iid].Item1;
+
                 Logger.Trace ("Parameter: {}", parameterValueSet);
                 Logger.Trace ("Param Owner: {}", parameterValueSet.DeriveOwner ());
                 Logger.Trace ("Param Element: {}", parameterValueSet.ContainerParameter.ContainerElementDefinition);
 
-                text += String.Format ("|{0}|{1}|{2} {3}|**{4}** {3}|\n",
+                text += String.Format ("|{0}|{1}|{2}|{3} {4}|**{5}** {4}|\n",
+                    FormatChangeKind(changeKind),
                     parameterValueSet.ContainerParameter.ContainerElementDefinition.Name + " (" + parameterValueSet.ContainerParameter.ContainerElementDefinition.ShortName + ")",
                     parameterValueSet.ContainerParameter.ParameterType.Name,
                     parameterValueSet.Published[0],
@@ -54,6 +57,22 @@ namespace OCDT_Notifier
                 );
 
             SendMessage (text);
+        }
+
+        private String FormatChangeKind(ChangeKind changeKind)
+        {
+            switch(changeKind) {
+            case ChangeKind.Added:
+                return ":sparkle:";
+            case ChangeKind.Updated:
+                return ":large_blue_circle:";
+            case ChangeKind.Deleted:
+                return ":heavy_minus_sign:";
+            case ChangeKind.Conflicted:
+                return ":warning:";
+            default:
+                return ":question:";
+            }
         }
 
         /// <summary>

@@ -131,16 +131,18 @@ namespace OCDT_Notifier {
                 if (domainObjectStoreChange != null) {
                     // Create a dictionary of thing types, so we can send them to the target later
                     var updatedThings = new Dictionary<ClassKind, List<Thing>> ();
+                    // Dictionary of complementary data
+                    var metadata = new Dictionary<Guid, Tuple<ChangeKind>> ();
 
                     // For every thing...
                     foreach (var changedDomainObject in domainObjectStoreChange.ChangedDomainObjects) {
                         // Some convenience variables
-                        ChangeKind updateType = changedDomainObject.Value;
+                        ChangeKind changeKind = changedDomainObject.Value;
                         Thing thing = changedDomainObject.Key;
 
                         // Make sure that the thing has been updated
                         // TODO: Remove this check, as it is not necessary anymore
-                        if (!allRevisions.ContainsKey (thing.Iid) || allRevisions [thing.Iid] != thing.RevisionNumber) {
+                        if (!allRevisions.ContainsKey (thing.Iid) || allRevisions [thing.Iid] != thing.RevisionNumber || changeKind == ChangeKind.Deleted || changeKind == ChangeKind.Conflicted) {
                             Logger.Warn ("New update for {}", thing);
                             allRevisions [thing.Iid] = thing.RevisionNumber;
 
@@ -149,6 +151,9 @@ namespace OCDT_Notifier {
                                 updatedThings [thing.ClassKind] = new List<Thing> ();
                             }
                             updatedThings [thing.ClassKind].Add (thing);
+
+                            // Add the complementary data of the Thing
+                            metadata [thing.Iid] = new Tuple<ChangeKind> (changeKind);
                         }
                     }
 
@@ -161,7 +166,7 @@ namespace OCDT_Notifier {
                         switch (entry.Key) {
                         case ClassKind.ParameterValueSet:
                             var list = entry.Value.ConvertAll (x => (ParameterValueSet)x);
-                            target.NotifyParameterValueSet (list);
+                            target.NotifyParameterValueSet (list, metadata);
                             break;
                         //case ClassKind.EngineeringModel:
                         //    break;
