@@ -13,23 +13,36 @@ namespace OCDT_Notifier
 
         protected Uri hook;
 
-        public void NotifyParameterValueSet(ParameterValueSet parameterValueSet)
+        public void NotifyParameterValueSet(List<ParameterValueSet> parameterValueSets)
         {
-            Logger.Trace("Parameter: {}", parameterValueSet);
-            Logger.Trace("Param Owner: {}", parameterValueSet.DeriveOwner());
-            Logger.Trace("Param Element: {}", parameterValueSet.ContainerParameter.ContainerElementDefinition);
+            // We assume the list is not empty
+            var text = "| Equipment | Parameter | Published | New value |\n| ----- |------|:----:|:----:|\n";
 
-            var text = String.Format("##### {0} Parameter value change\n- Equipment: **{1}** - {2}\n- New value: **{3}** {4} ({5})\n- Published (old) value: {6}",
-                parameterValueSet.DeriveOwner().ShortName,
-                parameterValueSet.ContainerParameter.ContainerElementDefinition.Name + " (" + parameterValueSet.ContainerParameter.ContainerElementDefinition.ShortName + ")",
-                parameterValueSet.ContainerParameter.ParameterType.Name,
-                parameterValueSet.ActualValue[0],
-                parameterValueSet.DeriveMeasurementScale() != null ? parameterValueSet.DeriveMeasurementScale().ShortName : "",
-                parameterValueSet.ValueSwitch.ToString(),
-                parameterValueSet.Published[0]
-                );
-                
-            SendMessage (text);
+            foreach (ParameterValueSet parameterValueSet in parameterValueSets) {
+                Logger.Trace ("Parameter: {}", parameterValueSet);
+                Logger.Trace ("Param Owner: {}", parameterValueSet.DeriveOwner ());
+                Logger.Trace ("Param Element: {}", parameterValueSet.ContainerParameter.ContainerElementDefinition);
+
+                text += String.Format ("|{0}|{1}|{2} {3}|**{4}** {3}|\n",
+                    parameterValueSet.ContainerParameter.ContainerElementDefinition.Name + " (" + parameterValueSet.ContainerParameter.ContainerElementDefinition.ShortName + ")",
+                    parameterValueSet.ContainerParameter.ParameterType.Name,
+                    parameterValueSet.Published[0],
+                    parameterValueSet.DeriveMeasurementScale () != null ? parameterValueSet.DeriveMeasurementScale ().ShortName : "",
+                    parameterValueSet.ActualValue[0]
+                    );
+
+                //var text = String.Format ("##### {0} Parameter value change\n- Equipment: **{1}** - {2}\n- New value: **{3}** {4} ({5})\n- Published (old) value: {6}",
+                    //parameterValueSet.DeriveOwner ().ShortName,
+                    //parameterValueSet.ContainerParameter.ContainerElementDefinition.Name + " (" + parameterValueSet.ContainerParameter.ContainerElementDefinition.ShortName + ")",
+                    //parameterValueSet.ContainerParameter.ParameterType.Name,
+                    //parameterValueSet.ActualValue [0],
+                    //parameterValueSet.DeriveMeasurementScale () != null ? parameterValueSet.DeriveMeasurementScale ().ShortName : "",
+                    //parameterValueSet.ValueSwitch.ToString (),
+                    //parameterValueSet.Published [0]
+                    //);
+
+                SendMessage (text);
+            }
         }
 
         public void NotifyOther(Thing thing)

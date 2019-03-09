@@ -114,11 +114,14 @@ namespace OCDT_Notifier {
             var queryParameters = new QueryParameters {
                 Extent = ExtentQueryParameterKind.DEEP,
                 IncludeAllContainers = true,
+                // Don't include the already loaded and rarely changing reference data
                 IncludeReferenceData = false,
+                // Make sure we read objects more recent than the last revision
                 RevisionNumber = modelRevisions[engineeringModel.Iid]
             };
 
             try {
+                // Read the revision
                 var domainObjectStoreChange = WebServiceClient.Read (iteration, queryParameters);
 
                 Logger.Debug (
@@ -126,29 +129,45 @@ namespace OCDT_Notifier {
                     domainObjectStoreChange == null ? 0 : domainObjectStoreChange.ChangedDomainObjects.Count);
 
                 if (domainObjectStoreChange != null) {
+                    // Create a dictionary of thing types, so we can send them to the target later
+                    var updatedThings = new Dictionary<ClassKind, List<Thing>> ();
+
+                    // For every thing...
                     foreach (var changedDomainObject in domainObjectStoreChange.ChangedDomainObjects) {
+                        // Some convenience variables
                         ChangeKind updateType = changedDomainObject.Value;
                         Thing thing = changedDomainObject.Key;
 
-                        if (!allRevisions.ContainsKey (thing.Iid)) {
-                            Logger.Warn ("New thing {}", thing);
-                            target.NotifyOther (thing);
-                            allRevisions [thing.Iid] = thing.RevisionNumber;
-                        } else if (allRevisions [thing.Iid] != thing.RevisionNumber) {
+                        // Make sure that the thing has been updated
+                        // TODO: Remove this check, as it is not necessary anymore
+                        if (!allRevisions.ContainsKey (thing.Iid) || allRevisions [thing.Iid] != thing.RevisionNumber) {
                             Logger.Warn ("New update for {}", thing);
                             allRevisions [thing.Iid] = thing.RevisionNumber;
 
-                            switch (thing.ClassKind) {
-                            case ClassKind.ParameterValueSet:
-                                Logger.Info ("Detected parameter value change");
-                                target.NotifyParameterValueSet ((ParameterValueSet)thing);
-                                break;
-                            case ClassKind.EngineeringModel:
-                                break;
-                            default:
-                                target.NotifyOther (thing);
-                                break;
+                            // Add the Thing to the list, so it can be sent to the target
+                            if (!updatedThings.ContainsKey(thing.ClassKind)) {
+                                updatedThings [thing.ClassKind] = new List<Thing> ();
                             }
+                            updatedThings [thing.ClassKind].Add (thing);
+                        }
+                    }
+
+                    // Send the things to the target
+                    foreach (KeyValuePair<ClassKind, List<Thing>> entry in updatedThings) {
+                        Logger.Info ("Detected {} change", entry.Key);
+
+
+
+                        switch (entry.Key) {
+                        case ClassKind.ParameterValueSet:
+                            var list = entry.Value.ConvertAll (x => (ParameterValueSet)x);
+                            target.NotifyParameterValueSet (list);
+                            break;
+                        //case ClassKind.EngineeringModel:
+                        //    break;
+                        //default:
+                        //    target.NotifyOther (thing);
+                        //    break;
                         }
                     }
                 }
