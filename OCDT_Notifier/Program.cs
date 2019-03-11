@@ -172,7 +172,25 @@ namespace OCDT_Notifier {
                                 List<ParameterValueSet> list = entry.Value.ConvertAll (x => (ParameterValueSet)x);
                                 // Group by domain of expertise, send a different message for each domain
                                 foreach (var sublist in SplitDomainsOfExpertise (list, u => u.Owner)) {
-                                    target.NotifyParameterValueSet (sublist, metadata);
+                                    var newSublist = sublist;
+
+                                    // Clear the clutter
+                                    if (configuration.Output.ClearClutter) {
+                                       // Filter some parameters
+                                        newSublist = sublist.FindAll (s => {
+                                            // The Guid of the corresponding Element Definition
+                                            var element = s.ContainerParameter.ContainerElementDefinition.Iid;
+
+                                            if (!metadata.ContainsKey (element)) return true;
+                                            // Don't show parameters that correspond to a new or a deleted element
+                                            // definition
+                                            return metadata [element].Item1 == ChangeKind.Updated;
+                                        });
+                                    }
+
+                                    if (!newSublist.IsEmpty ()) { // We might have no parameters left
+                                        target.NotifyParameterValueSet (newSublist, metadata);
+                                    }
                                 }
                                 break;
                             }

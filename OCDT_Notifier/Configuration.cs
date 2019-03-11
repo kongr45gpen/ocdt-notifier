@@ -45,6 +45,7 @@ namespace OCDT_Notifier {
 
         public class OutputType {
             public bool SplitOwners { get; set; }
+            public bool ClearClutter { get; set; }
         }
 
         public class TargetType {
