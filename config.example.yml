@@ -1,0 +1,24 @@
+ocdt_notifier:
+  # Details about the OCDT WSP server
+  server:
+    url: "http://server:1234"
+    username: username
+    password: password
+  # Details about fetching data from the EngineeringModels
+  fetch:
+    # The names of the Engineering Models to fetch
+    models: modelname
+    # The time between fetches (in seconds)
+    interval: 30
+  # Configuration about the output to the chat target
+  output:
+    # Whether to split changes by different domains of expertise into different posts
+    splitOwners: true
+    # Whether to hide some changes that are implied by others
+    clearClutter: true
+  # Details about the chat application
+  target:
+    # The mattermost incoming hook URL
+    hook: "https://mattermost.example.com/hooks/h00kadfmurl34dfmbh00k"
+  # Whether to enable some useful debugging functions
+  debug: false
