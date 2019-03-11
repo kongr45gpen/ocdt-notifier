@@ -20,7 +20,7 @@ namespace OCDT_Notifier
 
             // We assume the list is not empty
             var text = String.Format ("#### {0} {1} – Parameter values\n", FormatClassKind(ClassKind.ParameterValueSet), engineeringModelSetup.Name);
-            text += "|Domain|Type| Equipment | Parameter | New value | Published |\n|:---:|:---:|-----|------|:----:|:----:|\n";
+            text += "|Domain|Type| Equipment | Parameter | New value | Published |\n|:---:|:---:|-----|:------:|:----|:----|\n";
 
             foreach (ParameterValueSet parameterValueSet in parameterValueSets) {
                 ChangeKind changeKind = metadata [parameterValueSet.Iid].Item1;
@@ -30,13 +30,14 @@ namespace OCDT_Notifier
                 Logger.Trace ("Param Element: {}", parameterValueSet.ContainerParameter.ContainerElementDefinition);
                 Logger.Trace ("Param Path: {}", parameterValueSet.ContainerParameter.Path);
 
-                text += String.Format ("|{0}|{1}|{2}|{3}|**{4}** {5}|{6} {5}|\n",
+                text += String.Format ("|{0}|{1}|{2}|{3}|**{4}** {5}{6}|{7} {5}|\n",
                     parameterValueSet.DeriveOwner().ShortName,
                     FormatChangeKind(changeKind),
                     parameterValueSet.ContainerParameter.ContainerElementDefinition.Name + " (" + parameterValueSet.ContainerParameter.ContainerElementDefinition.ShortName + ")",
                     parameterValueSet.ContainerParameter.ParameterType.Name,
                     parameterValueSet.ActualValue [0],
                     parameterValueSet.DeriveMeasurementScale () != null ? parameterValueSet.DeriveMeasurementScale ().ShortName : "",
+                    parameterValueSet.ActualState == null ? "" : " (" + parameterValueSet.ActualState.ShortName + ")",
                     parameterValueSet.Published[0]
                     );
             }
