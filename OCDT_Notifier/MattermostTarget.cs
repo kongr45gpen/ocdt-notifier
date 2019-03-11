@@ -108,7 +108,7 @@ namespace OCDT_Notifier
             case ChangeKind.Updated:
                 return ":large_blue_circle:";
             case ChangeKind.Deleted:
-                return ":heavy_minus_sign:";
+                return ":x:";
             case ChangeKind.Conflicted:
                 return ":warning:";
             default:
