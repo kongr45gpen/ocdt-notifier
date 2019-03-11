@@ -27,6 +27,7 @@ namespace OCDT_Notifier
                 Logger.Trace ("Parameter: {}", parameterValueSet);
                 Logger.Trace ("Param Owner: {}", parameterValueSet.DeriveOwner ());
                 Logger.Trace ("Param Element: {}", parameterValueSet.ContainerParameter.ContainerElementDefinition);
+                Logger.Trace ("Param Path: {}", parameterValueSet.ContainerParameter.Path);
 
                 text += String.Format ("|{0}|{1}|{2}|{3}|**{4}** {5}|{6} {5}|\n",
                     parameterValueSet.DeriveOwner().ShortName,
@@ -37,9 +38,9 @@ namespace OCDT_Notifier
                     parameterValueSet.DeriveMeasurementScale () != null ? parameterValueSet.DeriveMeasurementScale ().ShortName : "",
                     parameterValueSet.Published[0]
                     );
-
-                SendMessage (text);
             }
+
+            SendMessage (text);
         }
 
         public void NotifyOther(Thing thing)
@@ -111,7 +112,9 @@ namespace OCDT_Notifier
 
             client = new RestClient(hook.GetLeftPart(UriPartial.Authority));
 
-            SendMessage ("```DEBUG: MM Target initialised```");
+            if (OCDTNotifier.configuration.Debug) {
+                SendMessage ("```DEBUG: MM Target initialised```");
+            }
         }
     }
 }

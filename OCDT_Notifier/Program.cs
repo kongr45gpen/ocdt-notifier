@@ -170,11 +170,17 @@ namespace OCDT_Notifier {
 
                         switch (entry.Key) {
                         case ClassKind.ParameterValueSet:
-                            var list = entry.Value.ConvertAll (x => (ParameterValueSet)x);
-                            target.NotifyParameterValueSet (list, metadata);
+                            // A parameter value was set
+                            List<ParameterValueSet> list = entry.Value.ConvertAll (x => (ParameterValueSet)x);
+                            // Group by domain of expertise, send a different message for each domain
+                            foreach (var sublist in SplitDomainsOfExpertise(list, u=> u.Owner)) {
+
+                                target.NotifyParameterValueSet (sublist, metadata);
+                            }
                             break;
-                        //case ClassKind.EngineeringModel:
-                        //    break;
+                        case ClassKind.EngineeringModel:
+                        case ClassKind.Iteration:
+                            break;
                         //default:
                         //    target.NotifyOther (thing);
                         //    break;
@@ -188,6 +194,18 @@ namespace OCDT_Notifier {
             } catch (Exception e) {
                 Logger.Error (e, "EngineeringModel was not read successfulsly: {}", e);
                 return;
+            }
+        }
+
+        private static IEnumerable<List<TSource>> SplitDomainsOfExpertise<TSource, TKey>(List<TSource> initial, Func<TSource, TKey> keySelector) {
+            if (configuration.Output.SplitOwners) {
+                var v1 = initial;
+                var v2 = initial.GroupBy (keySelector);
+                var v3 = v2.Select (grp => grp.ToList ());
+                var v4 = v3.ToList ();
+                return initial.GroupBy (keySelector).Select(grp => grp.ToList()).ToList();
+            } else {
+                return new List<TSource> [] { initial };
             }
         }
 

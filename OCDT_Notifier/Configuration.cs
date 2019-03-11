@@ -19,6 +19,13 @@ namespace OCDT_Notifier {
         public TargetType Target { get; set; }
 
         /// <summary>
+        /// Configuration of the types of messages sent to the target, and of
+        /// the way they are sent.
+        /// </summary>
+        /// <value>The filter.</value>
+        public OutputType Output { get; set; }
+
+        /// <summary>
         /// Whether OCDT notifier should be set to debugging mode, that enables some developer-friendly
         /// but not production-friendly configurations.
         /// </summary>
@@ -34,6 +41,10 @@ namespace OCDT_Notifier {
         public class FetchType {
             public string Models { get; set; }
             public float Interval { get; set; }
+        }
+
+        public class OutputType {
+            public bool SplitOwners { get; set; }
         }
 
         public class TargetType {
