@@ -57,10 +57,15 @@ namespace OCDT_Notifier {
                     poll (engineeringModelSetup);
                 }
 
-                // Sleep until the next reading time
-                var interval = (int)(configuration.Fetch.Interval * 1000);
-                Logger.Trace ("Sleeping for {} ms", interval);
-                System.Threading.Thread.Sleep (interval);
+                if (configuration.Debug) {
+                    Console.WriteLine ("Please press Enter to read new values...");
+                    Console.ReadLine ();
+                } else {
+                    // Sleep until the next reading time
+                    var interval = (int)(configuration.Fetch.Interval * 1000);
+                    Logger.Trace ("Sleeping for {} ms", interval);
+                    System.Threading.Thread.Sleep (interval);
+                }
             }
         }
 
