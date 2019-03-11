@@ -75,6 +75,35 @@ namespace OCDT_Notifier
             SendMessage (text);
         }
 
+        public void NotifyElementUsage(List<ElementUsage> elementUsages, Dictionary<Guid, Tuple<ChangeKind>> metadata)
+        {
+            EngineeringModelSetup engineeringModelSetup = elementUsages[0].ContainerElementDefinition.ContainerIteration.ContainerEngineeringModel.EngineeringModelSetup;
+            
+            var text = String.Format("#### {0} {1} – Element Usages\n", FormatClassKind(ClassKind.ElementUsage), engineeringModelSetup.Name);
+            text += "|Domain|Type| Parent | Name | Element |\n|:---:|:---:|-----|------|----|\n";
+
+            foreach (ElementUsage elementUsage in elementUsages)
+            {
+                ChangeKind changeKind = metadata[elementUsage.Iid].Item1;
+
+                Logger.Trace("Element usage path: {}", elementUsage.Path);
+
+                text += String.Format("|{0}|{1}{2}|{3}|{4} ({5})|{5} ({6})\n",
+                   elementUsage.Owner.ShortName,
+                   FormatChangeKind(changeKind),
+                   (changeKind != ChangeKind.Updated) ? " **Usage " + changeKind.ToString() + "**" : "",
+                   elementUsage.ContainerElementDefinition.Name,
+                   elementUsage.Name,
+                   elementUsage.ShortName,
+                   elementUsage.ElementDefinition.Name,
+                   elementUsage.ElementDefinition.ShortName
+                );
+            }
+
+            SendMessage(text);
+        }
+
+
         public void NotifyOther(Thing thing)
         {
             var text = String.Format ("##### Other change ({0})\n`{1}`\n```yaml\n{2}```",

@@ -204,6 +204,16 @@ namespace OCDT_Notifier {
 
                                 break;
                             }
+                        case ClassKind.ElementUsage: {
+                                // An element usage was edited
+                                List<ElementUsage> list = entry.Value.ConvertAll(x => (ElementUsage)x);
+
+                                foreach (var sublist in SplitDomainsOfExpertise(list, u => u.Owner)) {
+                                    target.NotifyElementUsage(sublist, metadata);
+                                }
+
+                                break;
+                                }
                         case ClassKind.EngineeringModel:
                         case ClassKind.Iteration:
                             break;
@@ -225,12 +235,10 @@ namespace OCDT_Notifier {
 
         private static IEnumerable<List<TSource>> SplitDomainsOfExpertise<TSource, TKey>(List<TSource> initial, Func<TSource, TKey> keySelector) {
             if (configuration.Output.SplitOwners) {
-                var v1 = initial;
-                var v2 = initial.GroupBy (keySelector);
-                var v3 = v2.Select (grp => grp.ToList ());
-                var v4 = v3.ToList ();
+                // Group using the provided keySelector function
                 return initial.GroupBy (keySelector).Select(grp => grp.ToList()).ToList();
             } else {
+                // An array containing just the given list itself
                 return new List<TSource> [] { initial };
             }
         }
