@@ -166,18 +166,26 @@ namespace OCDT_Notifier {
                     foreach (KeyValuePair<ClassKind, List<Thing>> entry in updatedThings) {
                         Logger.Info ("Detected {} change", entry.Key);
 
-
-
                         switch (entry.Key) {
-                        case ClassKind.ParameterValueSet:
-                            // A parameter value was set
-                            List<ParameterValueSet> list = entry.Value.ConvertAll (x => (ParameterValueSet)x);
-                            // Group by domain of expertise, send a different message for each domain
-                            foreach (var sublist in SplitDomainsOfExpertise(list, u=> u.Owner)) {
-
-                                target.NotifyParameterValueSet (sublist, metadata);
+                        case ClassKind.ParameterValueSet: {
+                                // A parameter value was set
+                                List<ParameterValueSet> list = entry.Value.ConvertAll (x => (ParameterValueSet)x);
+                                // Group by domain of expertise, send a different message for each domain
+                                foreach (var sublist in SplitDomainsOfExpertise (list, u => u.Owner)) {
+                                    target.NotifyParameterValueSet (sublist, metadata);
+                                }
+                                break;
                             }
-                            break;
+                        case ClassKind.ElementDefinition: {
+                                // An element definition was edited
+                                List<ElementDefinition> list = entry.Value.ConvertAll (x => (ElementDefinition)x);
+
+                                foreach (var sublist in SplitDomainsOfExpertise (list, u => u.Owner)) {
+                                    target.NotifyElementDefinition (sublist, metadata);
+                                }
+
+                                break;
+                            }
                         case ClassKind.EngineeringModel:
                         case ClassKind.Iteration:
                             break;

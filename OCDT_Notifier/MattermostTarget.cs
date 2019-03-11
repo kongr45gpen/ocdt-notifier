@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using NLog;
 using Ocdt.DomainModel;
 using RestSharp;
@@ -43,6 +44,36 @@ namespace OCDT_Notifier
             SendMessage (text);
         }
 
+        public void NotifyElementDefinition (List<ElementDefinition> elementDefinitions, Dictionary<Guid, Tuple<ChangeKind>> metadata)
+        {
+            EngineeringModelSetup engineeringModelSetup = elementDefinitions [0].ContainerIteration.ContainerEngineeringModel.EngineeringModelSetup;
+
+            var text = String.Format ("#### {0} {1} – Element Definitions\n", FormatClassKind (ClassKind.ElementDefinition), engineeringModelSetup.Name);
+            text += "|Domain|Type| Name | Description | Categories | # Parameters |\n|:---:|:---:|-----|------|:----:|----:|\n";
+
+            foreach (ElementDefinition elementDefinition in elementDefinitions) {
+                ChangeKind changeKind = metadata [elementDefinition.Iid].Item1;
+
+                Logger.Trace ("Element path: {}", elementDefinition.Path);
+
+                var definition = elementDefinition.Definition.SingleOrDefault(d => d.LanguageCode == "en-GB");
+                if (definition == null) definition = elementDefinition.Definition.SingleOrDefault();
+
+                text += String.Format ("|{0}|{1}{2}|{3} ({4})|{5}|{6}|{7}|\n",
+                   elementDefinition.Owner.ShortName,
+                   FormatChangeKind (changeKind),
+                   (changeKind != ChangeKind.Updated) ? " **Element " + changeKind.ToString () + "**" : "",
+                   elementDefinition.Name,
+                   elementDefinition.ShortName,
+                   definition == null ? "" : definition.Content,
+                   string.Join(", ", elementDefinition.GetAllCategories ().Select (c => c.ShortName)),
+                   elementDefinition.Parameter.Count
+                    );
+            }
+
+            SendMessage (text);
+        }
+
         public void NotifyOther(Thing thing)
         {
             var text = String.Format ("##### Other change ({0})\n`{1}`\n```yaml\n{2}```",
@@ -59,6 +90,10 @@ namespace OCDT_Notifier
             switch(classKind) {
             case ClassKind.ParameterValueSet:
                 return ":gear:";
+            case ClassKind.ElementDefinition:
+                return ":package:";
+            case ClassKind.ElementUsage:
+                return ":arrow_lower_right: :package:";
             default:
                 return "";
             }
