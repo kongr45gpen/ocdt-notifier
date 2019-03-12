@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using NLog;
 using Ocdt.DomainModel;
+using OCDT_Notifier.Utilities;
 using RestSharp;
 
 namespace OCDT_Notifier
@@ -16,74 +17,73 @@ namespace OCDT_Notifier
 
         public void NotifyParameterValueSet(List<ParameterValueSet> parameterValueSets, Dictionary<Guid, Tuple<ChangeKind>> metadata)
         {
-            EngineeringModelSetup engineeringModelSetup = parameterValueSets [0].ContainerParameter.ContainerElementDefinition.ContainerIteration.ContainerEngineeringModel.EngineeringModelSetup;
+            EngineeringModelSetup engineeringModelSetup = parameterValueSets[0].ContainerParameter.ContainerElementDefinition.ContainerIteration.ContainerEngineeringModel.EngineeringModelSetup;
 
             // We assume the list is not empty
-            var text = String.Format ("#### {0} {1} – Parameter values\n", FormatClassKind(ClassKind.ParameterValueSet), engineeringModelSetup.Name);
+            var text = String.Format("#### {0} {1} – Parameter values\n", FormatClassKind(ClassKind.ParameterValueSet), engineeringModelSetup.Name);
             text += "|Domain|Type| Equipment | Parameter | New value | Published |\n|:---:|:---:|-----|:------:|:----|:----|\n";
 
             foreach (ParameterValueSet parameterValueSet in parameterValueSets) {
-                ChangeKind changeKind = metadata [parameterValueSet.Iid].Item1;
+                ChangeKind changeKind = metadata[parameterValueSet.Iid].Item1;
 
-                Logger.Trace ("Parameter: {}", parameterValueSet);
-                Logger.Trace ("Param Owner: {}", parameterValueSet.DeriveOwner ());
-                Logger.Trace ("Param Element: {}", parameterValueSet.ContainerParameter.ContainerElementDefinition);
-                Logger.Trace ("Param Path: {}", parameterValueSet.ContainerParameter.Path);
+                Logger.Trace("Parameter: {}", parameterValueSet);
+                Logger.Trace("Param Owner: {}", parameterValueSet.DeriveOwner());
+                Logger.Trace("Param Element: {}", parameterValueSet.ContainerParameter.ContainerElementDefinition);
+                Logger.Trace("Param Path: {}", parameterValueSet.ContainerParameter.Path);
 
-                text += String.Format ("|{0}|{1}|{2}|{3}|**{4}** {5}{6}|{7} {5}|\n",
+                text += String.Format("|{0}|{1}|{2}|{3}|**{4}** {5}{6}|{7} {5}|\n",
                     parameterValueSet.DeriveOwner().ShortName,
                     FormatChangeKind(changeKind),
                     parameterValueSet.ContainerParameter.ContainerElementDefinition.Name + " (" + parameterValueSet.ContainerParameter.ContainerElementDefinition.ShortName + ")",
                     parameterValueSet.ContainerParameter.ParameterType.Name,
-                    parameterValueSet.ActualValue [0],
-                    parameterValueSet.DeriveMeasurementScale () != null ? parameterValueSet.DeriveMeasurementScale ().ShortName : "",
+                    parameterValueSet.ActualValue[0],
+                    parameterValueSet.DeriveMeasurementScale() != null ? parameterValueSet.DeriveMeasurementScale().ShortName : "",
                     parameterValueSet.ActualState == null ? "" : " (" + parameterValueSet.ActualState.ShortName + ")",
                     parameterValueSet.Published[0]
                     );
             }
 
-            SendMessage (text, parameterValueSets.First().Owner);
+            SendMessage(text, parameterValueSets.First().Owner);
         }
 
-        public void NotifyElementDefinition (List<ElementDefinition> elementDefinitions, Dictionary<Guid, Tuple<ChangeKind>> metadata)
+        public void NotifyElementDefinition(List<ElementDefinition> elementDefinitions, Dictionary<Guid, Tuple<ChangeKind>> metadata)
         {
-            EngineeringModelSetup engineeringModelSetup = elementDefinitions [0].ContainerIteration.ContainerEngineeringModel.EngineeringModelSetup;
+            EngineeringModelSetup engineeringModelSetup = elementDefinitions[0].ContainerIteration.ContainerEngineeringModel.EngineeringModelSetup;
 
-            var text = String.Format ("#### {0} {1} – Element Definitions\n", FormatClassKind (ClassKind.ElementDefinition), engineeringModelSetup.Name);
+            var text = String.Format("#### {0} {1} – Element Definitions\n", FormatClassKind(ClassKind.ElementDefinition), engineeringModelSetup.Name);
             text += "|Domain|Type| Name | Description | Categories | # Parameters |\n|:---:|:---:|-----|------|:----:|----:|\n";
 
             foreach (ElementDefinition elementDefinition in elementDefinitions) {
-                ChangeKind changeKind = metadata [elementDefinition.Iid].Item1;
+                ChangeKind changeKind = metadata[elementDefinition.Iid].Item1;
 
-                Logger.Trace ("Element path: {}", elementDefinition.Path);
+                Logger.Trace("Element path: {}", elementDefinition.Path);
 
                 var definition = elementDefinition.Definition.SingleOrDefault(d => d.LanguageCode == "en-GB");
                 if (definition == null) definition = elementDefinition.Definition.SingleOrDefault();
 
-                text += String.Format ("|{0}|{1}{2}|{3} ({4})|{5}|{6}|{7}|\n",
+                text += String.Format("|{0}|{1}{2}|{3} ({4})|{5}|{6}|{7}|\n",
                    elementDefinition.Owner.ShortName,
-                   FormatChangeKind (changeKind),
-                   (changeKind != ChangeKind.Updated) ? " **Element " + changeKind.ToString () + "**" : "",
+                   FormatChangeKind(changeKind),
+                   (changeKind != ChangeKind.Updated) ? " **Element " + changeKind.ToString() + "**" : "",
                    elementDefinition.Name,
                    elementDefinition.ShortName,
                    definition == null ? "" : definition.Content,
-                   string.Join(", ", elementDefinition.GetAllCategories ().Select (c => c.ShortName)),
+                   string.Join(", ", elementDefinition.GetAllCategories().Select(c => c.ShortName)),
                    elementDefinition.Parameter.Count
                     );
             }
 
-            SendMessage (text, elementDefinitions.First().Owner);
+            SendMessage(text, elementDefinitions.First().Owner);
         }
 
         public void NotifyElementUsage(List<ElementUsage> elementUsages, Dictionary<Guid, Tuple<ChangeKind>> metadata)
         {
             EngineeringModelSetup engineeringModelSetup = elementUsages[0].ContainerElementDefinition.ContainerIteration.ContainerEngineeringModel.EngineeringModelSetup;
-            
+
             var text = String.Format("#### {0} {1} – Element Usages\n", FormatClassKind(ClassKind.ElementUsage), engineeringModelSetup.Name);
             text += "|Domain|Type| Parent | Name | Element |\n|:---:|:---:|-----|------|----|\n";
 
-            foreach (ElementUsage elementUsage in elementUsages)
-            {
+            foreach (ElementUsage elementUsage in elementUsages) {
                 ChangeKind changeKind = metadata[elementUsage.Iid].Item1;
 
                 Logger.Trace("Element usage path: {}", elementUsage.Path);
@@ -101,6 +101,54 @@ namespace OCDT_Notifier
             }
 
             SendMessage(text, elementUsages.First().Owner);
+        }
+
+        public void NotifyPublication(Publication publication, Dictionary<Guid, Tuple<ChangeKind>> metadata)
+        {
+            EngineeringModelSetup engineeringModelSetup = publication.ContainerIteration.ContainerEngineeringModel.EngineeringModelSetup;
+
+            var text = String.Format("{0}\n#### {1} {2} – Publication\n",
+                OCDTNotifier.configuration.Target.PublicationPreamble,
+                FormatClassKind(ClassKind.Publication),
+                engineeringModelSetup.Name
+            );
+            text += String.Format("Publication #**{0}**, {1}.\nContains {2} parameter{3} from {4}.\n\n",
+                publication.PublicationNumber,
+                publication.CreatedOn,
+                publication.PublishedParameter.Count,
+                publication.PublishedParameter.Count == 1 ? "" : "s",
+                publication.Domain.Aggregate("", (s, v) => s += ((s == "") ? "" : ", ") + v.ShortName)
+            );
+
+            text += "|DOE|Typ.| Element | Parameter | Parameter Path | Published Value | Switch |\n|:---:|:---:|-----|------|----|---|:---:|\n";
+
+            ThingTreeNode publicationTree = new ThingTreeNode(null);
+
+            foreach (ParameterOrOverrideBase paramBase in publication.PublishedParameter) {
+                ElementDefinition elementDefinition = paramBase.GetContainerElementDefinition();
+
+                if (paramBase.GetType() == typeof(Ocdt.DomainModel.Parameter)) {
+                    Ocdt.DomainModel.Parameter parameter = (Ocdt.DomainModel.Parameter)paramBase;
+
+                    foreach (ParameterValueSet valueSet in parameter.ValueSet) {
+                        publicationTree.AddThingAndItsContainers(valueSet);
+
+                        text += String.Format("|{0}|{1}|**{2}**|**{3}**| `{4}` |**{5}** {6}|{7}|\n",
+                           parameter.Owner.ShortName,
+                           FormatClassKind(valueSet),
+                           elementDefinition.Name,
+                           parameter.ParameterType.Name,
+                           valueSet.Path,
+                           valueSet.Published.First(),
+                           valueSet.DeriveMeasurementScale().ShortName,
+                           valueSet.ValueSwitch
+                        );
+                    }
+                }
+            }
+
+
+            SendMessage(text);
         }
 
         public void NotifyIteration(List<Iteration> iterations, Dictionary<Guid, Tuple<ChangeKind>> metadata)
@@ -130,13 +178,24 @@ namespace OCDT_Notifier
 
         public void NotifyOther(Thing thing)
         {
-            var text = String.Format ("##### Other change ({0})\n`{1}`\n```yaml\n{2}```",
+            var text = String.Format("##### Other change ({0})\n`{1}`\n```yaml\n{2}```",
                 thing.GetType().Name,
                 thing.ToShortString(),
-                thing.ToDto ().ToJsonString ().Replace (",", ",\n")
+                thing.ToDto().ToJsonString().Replace(",", ",\n")
                 );
 
-            SendMessage (text);
+            SendMessage(text);
+        }
+
+        private String FormatClassKind(Thing thing)
+        {
+            if (thing.ClassKind == ClassKind.ParameterValueSet) {
+                if (((ParameterValueSet)thing).ContainerParameter.IsStateDependent) {
+                    return ":gear::hammer_and_pick:";
+                }
+            }
+
+            return FormatClassKind(thing.ClassKind);
         }
 
         private String FormatClassKind(ClassKind classKind)

@@ -289,6 +289,13 @@ namespace OCDT_Notifier {
 
                                 break;
                                 }
+                        case ClassKind.Publication: {
+                                foreach (var publication in entry.Value) {
+                                    target.NotifyPublication((Publication) publication, metadata);
+                                }
+
+                                break;
+                            }
                         case ClassKind.EngineeringModel:
                             break;
                         case ClassKind.Iteration: {
