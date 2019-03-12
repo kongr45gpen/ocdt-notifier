@@ -20,5 +20,9 @@ ocdt_notifier:
   target:
     # The mattermost incoming hook URL
     hook: "https://mattermost.example.com/hooks/h00kadfmurl34dfmbh00k"
+    # A list of URLs to show as profile icons for each Domain of Expertise
+    profileIcons:
+        COMMS: "https://upload.wikimedia.org/wikipedia/commons/7/7b/Satellite_dish_1_C-Band.jpg"
+        EPS: "https://upload.wikimedia.org/wikipedia/commons/3/3b/Batteries.jpg"
   # Whether to enable some useful debugging functions
   debug: false

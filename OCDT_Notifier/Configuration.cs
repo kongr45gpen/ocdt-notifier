@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+
 namespace OCDT_Notifier {
     public class Configuration {
         /// <summary>
@@ -50,6 +52,7 @@ namespace OCDT_Notifier {
 
         public class TargetType {
             public string Hook { get; set; }
+            public Dictionary<String, String> ProfileIcons { get; set; }
         }
 
         /// <summary>

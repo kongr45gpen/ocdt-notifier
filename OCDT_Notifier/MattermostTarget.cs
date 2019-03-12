@@ -42,7 +42,7 @@ namespace OCDT_Notifier
                     );
             }
 
-            SendMessage (text);
+            SendMessage (text, parameterValueSets.First().Owner);
         }
 
         public void NotifyElementDefinition (List<ElementDefinition> elementDefinitions, Dictionary<Guid, Tuple<ChangeKind>> metadata)
@@ -72,7 +72,7 @@ namespace OCDT_Notifier
                     );
             }
 
-            SendMessage (text);
+            SendMessage (text, elementDefinitions.First().Owner);
         }
 
         public void NotifyElementUsage(List<ElementUsage> elementUsages, Dictionary<Guid, Tuple<ChangeKind>> metadata)
@@ -100,7 +100,7 @@ namespace OCDT_Notifier
                 );
             }
 
-            SendMessage(text);
+            SendMessage(text, elementUsages.First().Owner);
         }
 
 
@@ -149,9 +149,12 @@ namespace OCDT_Notifier
         /// Sends a post to the Mattermost channel
         /// </summary>
         /// <param name="message">The markdown-formatted message to send</param>
-        private void SendMessage(String message)
+        private void SendMessage(String message, DomainOfExpertise domain = null)
         {
-            SendCustomMessage (new { text = message });
+            SendCustomMessage (new {
+                text = message,
+                icon_url = GetDomainImage(domain)
+            });
         }
 
         /// <summary>
@@ -169,6 +172,25 @@ namespace OCDT_Notifier
                     Logger.Error ("Unable to write to MM: {}", response.Content);
                 }
             });
+        }
+
+        /// <summary>
+        /// Get the profile image corresponding to a certain domain of expertise
+        /// </summary>
+        /// <param name="domainOfExpertise">A domain of expertise, or null</param>
+        /// <returns>The URL of the image, or "" on failure</returns>
+        private String GetDomainImage(DomainOfExpertise domainOfExpertise)
+        {
+            if (domainOfExpertise == null) {
+                return "";
+            } else if (!OCDTNotifier.configuration.Output.SplitOwners) {
+                // If we're not splitting owners, don't show an image
+                return "";
+            } else if (OCDTNotifier.configuration.Target.ProfileIcons.ContainsKey(domainOfExpertise.ShortName)) {
+                return OCDTNotifier.configuration.Target.ProfileIcons[domainOfExpertise.ShortName];
+            } else {
+                return "";
+            }
         }
 
         public MattermostTarget()
