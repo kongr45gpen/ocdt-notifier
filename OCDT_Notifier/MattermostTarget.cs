@@ -5,6 +5,7 @@ using NLog;
 using Ocdt.DomainModel;
 using OCDT_Notifier.Utilities;
 using RestSharp;
+using Parameter = Ocdt.DomainModel.Parameter;
 
 namespace OCDT_Notifier
 {
@@ -127,25 +128,60 @@ namespace OCDT_Notifier
             foreach (ParameterOrOverrideBase paramBase in publication.PublishedParameter) {
                 ElementDefinition elementDefinition = paramBase.GetContainerElementDefinition();
 
-                if (paramBase.GetType() == typeof(Ocdt.DomainModel.Parameter)) {
-                    Ocdt.DomainModel.Parameter parameter = (Ocdt.DomainModel.Parameter)paramBase;
-
-                    foreach (ParameterValueSet valueSet in parameter.ValueSet) {
-                        publicationTree.AddThingAndItsContainers(valueSet);
-
-                        text += String.Format("|{0}|{1}|**{2}**|**{3}**| `{4}` |**{5}** {6}|{7}|\n",
-                           parameter.Owner.ShortName,
-                           FormatClassKind(valueSet),
-                           elementDefinition.Name,
-                           parameter.ParameterType.Name,
-                           valueSet.Path,
-                           valueSet.Published.First(),
-                           valueSet.DeriveMeasurementScale().ShortName,
-                           valueSet.ValueSwitch
-                        );
+                if (paramBase.ClassKind == ClassKind.Parameter) {
+                    foreach (ParameterValueSet t in ((Parameter)paramBase).ValueSet) {
+                        publicationTree.AddThingAndItsContainers(t);
+                    }
+                } else if (paramBase.ClassKind == ClassKind.ParameterOverride) {
+                    foreach (ParameterOverrideValueSet t in ((ParameterOverride)paramBase).ValueSet) {
+                        publicationTree.AddThingAndItsContainers(t);
                     }
                 }
             }
+
+            publicationTree.Traverse(thing => {
+                if (thing.ClassKind == ClassKind.ParameterValueSet) {
+                    ParameterValueSet parameterValueSet = (ParameterValueSet)thing;
+                    Parameter parameter = parameterValueSet.ContainerParameter;
+
+                    text += String.Format("|{0}|{1}|**{2}**|**{3}**| `{4}` |**{5}** {6}|{7}|\n",
+                          parameterValueSet.Owner.ShortName,
+                          FormatClassKind(thing),
+                          parameter.ContainerElementDefinition.Name,
+                          parameter.ParameterType.Name,
+                          parameterValueSet.Path,
+                          parameterValueSet.Published.First(),
+                          parameterValueSet.DeriveMeasurementScale().ShortName,
+                          parameterValueSet.ValueSwitch
+                       );
+                } else if (thing.ClassKind == ClassKind.Parameter) {
+                    Parameter parameter = (Parameter)thing;
+
+                    // We don't want to bloat double entries with non-state-dependent parameters
+                    if (!parameter.IsStateDependent) {
+                        return;
+                    }
+
+                    text += String.Format("|{0}|{1}|**{2}**|**{3}**|State dependence: {4} ({5})|||\n",
+                          parameter.Owner.ShortName,
+                          FormatClassKind(thing),
+                          parameter.ContainerElementDefinition.Name,
+                          parameter.ParameterType.Name,
+                          parameter.StateDependence.Name,
+                          parameter.StateDependence.ShortName
+                       );
+                } else if (thing.ClassKind == ClassKind.ElementDefinition) {
+                    ElementDefinition elementDefinition = (ElementDefinition)thing;
+
+                    text += String.Format("|{0}|{1}|**{2}**|||||\n",
+                          elementDefinition.Owner.ShortName,
+                          FormatClassKind(thing),
+                          elementDefinition.Name
+                       );
+                } else {
+                    Logger.Warn("Found unexpected container {} while traversing tree", thing.ClassKind);
+                }
+            });
 
 
             SendMessage(text);

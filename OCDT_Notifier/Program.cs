@@ -182,58 +182,56 @@ namespace OCDT_Notifier {
                         Thing thing = changedDomainObject.Key;
 
                         // Make sure that the thing has been updated
-                        if (!allRevisions.ContainsKey (thing.Iid) || changeKind == ChangeKind.Deleted || changeKind == ChangeKind.Conflicted) {
-                            Logger.Warn ("New update for {}", thing);
-                            allRevisions [thing.Iid] = thing.RevisionNumber;
+                        Logger.Warn ("New update for {}", thing);
+                        allRevisions [thing.Iid] = thing.RevisionNumber;
 
-                            // First, find out if we should notify about the thing
-                            bool addThingToList = false;
-                            if (configuration.Output.ClearClutter) {
-                               // Clear clutter is enabled, take attention
-                               if (changeKind != ChangeKind.Updated) {
-                                    // All "significant" changes pass
+                        // First, find out if we should notify about the thing
+                        bool addThingToList = false;
+                        if (configuration.Output.ClearClutter) {
+                            // Clear clutter is enabled, take attention
+                            if (changeKind != ChangeKind.Updated) {
+                                // All "significant" changes pass
+                                addThingToList = true;
+                            } else if (clutteredKinds.Contains(thing.ClassKind)) {
+                                // Perform a comparison to see if the thing should be published
+                                if (!olderThings.ContainsKey(thing.Iid)) {
+                                    // No "old thing" exists; probably new
                                     addThingToList = true;
-                               } else if (clutteredKinds.Contains(thing.ClassKind)) {
-                                    // Perform a comparison to see if the thing should be published
-                                    if (!olderThings.ContainsKey(thing.Iid)) {
-                                        // No "old thing" exists; probably new
-                                        addThingToList = true;
-                                    } else {
-                                        NativeDtoChangeSet changeSet = new NativeDtoChangeSet();
-                                        thing.DeriveNetChanges(olderThings[thing.Iid], changeSet);
-
-                                        // Find only "interesting" changes
-                                        addThingToList = changeSet.UpdateSection.FirstOrDefault().Value.Any(u => {
-                                            if (interestingParameters.Contains(u.Key)) {
-                                                Logger.Trace("Thing contains interesting parameter {}", u.Key);
-                                                return true;
-                                            } else {
-                                                return false;
-                                            }
-                                        });
-                                    }
                                 } else {
-                                    addThingToList = true;
-                               }
+                                    NativeDtoChangeSet changeSet = new NativeDtoChangeSet();
+                                    thing.DeriveNetChanges(olderThings[thing.Iid], changeSet);
+
+                                    // Find only "interesting" changes
+                                    addThingToList = changeSet.UpdateSection.FirstOrDefault().Value.Any(u => {
+                                        if (interestingParameters.Contains(u.Key)) {
+                                            Logger.Trace("Thing contains interesting parameter {}", u.Key);
+                                            return true;
+                                        } else {
+                                            return false;
+                                        }
+                                    });
+                                }
                             } else {
                                 addThingToList = true;
                             }
+                        } else {
+                            addThingToList = true;
+                        }
 
-                            // Add the Thing to the list, so it can be sent to the target
-                            if (addThingToList) {
-                                if (!updatedThings.ContainsKey(thing.ClassKind)) {
-                                    updatedThings[thing.ClassKind] = new List<Thing>();
-                                }
-                                updatedThings[thing.ClassKind].Add(thing);
+                        // Add the Thing to the list, so it can be sent to the target
+                        if (addThingToList) {
+                            if (!updatedThings.ContainsKey(thing.ClassKind)) {
+                                updatedThings[thing.ClassKind] = new List<Thing>();
                             }
+                            updatedThings[thing.ClassKind].Add(thing);
+                        }
 
-                            // Add the complementary data of the Thing
-                            metadata [thing.Iid] = new Tuple<ChangeKind> (changeKind);
+                        // Add the complementary data of the Thing
+                        metadata [thing.Iid] = new Tuple<ChangeKind> (changeKind);
 
-                            // Store some older things
-                            if (thing.ClassKind == ClassKind.ElementDefinition || thing.ClassKind == ClassKind.ElementUsage) {
-                                olderThings[thing.Iid] = thing.CreateShallowClone();
-                            }
+                        // Store some older things
+                        if (thing.ClassKind == ClassKind.ElementDefinition || thing.ClassKind == ClassKind.ElementUsage) {
+                            olderThings[thing.Iid] = thing.CreateShallowClone();
                         }
                     }
 
