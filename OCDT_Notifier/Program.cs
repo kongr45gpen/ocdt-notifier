@@ -138,16 +138,19 @@ namespace OCDT_Notifier {
             // Read the engineering model
             WebServiceClient.Read (engineeringModel);
             engineeringModel = (EngineeringModel)ObjStore.GetByIid (iid: engineeringModel.Iid);
+            iteration = (Iteration)ObjStore.GetByIid(iid: engineeringModel.EngineeringModelSetup.LastIterationSetup.IterationIid);
             Logger.Trace ("Loaded EM {} with revision {} (setup revision {})", engineeringModelSetup.ShortName, engineeringModel.RevisionNumber, engineeringModelSetup.RevisionNumber);
+            // TODO: These lines may not be needed
             modelRevisions [engineeringModel.Iid] = engineeringModel.RevisionNumber;
+            modelRevisions[iteration.Iid] = iteration.RevisionNumber;
         }
 
         private void poll (EngineeringModelSetup engineeringModelSetup)
         {
             Logger.Debug ("Querying EngineeringModelSetup {}", engineeringModelSetup.Name);
             var engineeringModel = (EngineeringModel)ObjStore.GetByIid (iid: engineeringModelSetup.EngineeringModelIid);
-            var iteration = new Iteration (iid: engineeringModelSetup.LastIterationSetup.IterationIid);
-            engineeringModel.Iteration.Add (iteration);
+            var iteration = (Iteration)ObjStore.GetByIid(iid: engineeringModel.EngineeringModelSetup.LastIterationSetup.IterationIid);
+            //engineeringModel.Iteration.Add (iteration);
 
             var queryParameters = new QueryParameters {
                 Extent = ExtentQueryParameterKind.DEEP,
@@ -179,8 +182,7 @@ namespace OCDT_Notifier {
                         Thing thing = changedDomainObject.Key;
 
                         // Make sure that the thing has been updated
-                        // TODO: Remove this check, as it is not necessary anymore
-                        if (!allRevisions.ContainsKey (thing.Iid) || allRevisions [thing.Iid] != thing.RevisionNumber || changeKind == ChangeKind.Deleted || changeKind == ChangeKind.Conflicted) {
+                        if (!allRevisions.ContainsKey (thing.Iid) || changeKind == ChangeKind.Deleted || changeKind == ChangeKind.Conflicted) {
                             Logger.Warn ("New update for {}", thing);
                             allRevisions [thing.Iid] = thing.RevisionNumber;
 
@@ -288,11 +290,17 @@ namespace OCDT_Notifier {
                                 break;
                                 }
                         case ClassKind.EngineeringModel:
-                        case ClassKind.Iteration:
                             break;
-                        //default:
-                        //    target.NotifyOther (thing);
-                        //    break;
+                        case ClassKind.Iteration: {
+                                // An iteration was edited
+                                List<Iteration> list = entry.Value.ConvertAll(x => (Iteration)x);
+                                target.NotifyIteration(list, metadata);
+
+                                break;
+                            }
+                                //default:
+                                //    target.NotifyOther (thing);
+                                //    break;
                         }
                     }
                 }

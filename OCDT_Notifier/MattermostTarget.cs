@@ -103,6 +103,30 @@ namespace OCDT_Notifier
             SendMessage(text, elementUsages.First().Owner);
         }
 
+        public void NotifyIteration(List<Iteration> iterations, Dictionary<Guid, Tuple<ChangeKind>> metadata)
+        {
+            EngineeringModelSetup engineeringModelSetup = iterations.First().ContainerEngineeringModel.EngineeringModelSetup;
+
+            var text = String.Format("#### {0} {1} – Iterations\n", FormatClassKind(ClassKind.Iteration), engineeringModelSetup.Name);
+            text += "|Type| Engineering Model | Iteration # | Description | Frozen on |\n|:---:|---|-----|:---|----|\n";
+
+            foreach (Iteration iteration in iterations) {
+                ChangeKind changeKind = metadata[iteration.Iid].Item1;
+
+                text += String.Format("|{0}{1}|{2} ({3})|**{4}**|{5}|\n",
+                   FormatChangeKind(changeKind),
+                   (changeKind != ChangeKind.Updated) ? " **Iteration " + changeKind.ToString() + "**" : "",
+                   iteration.ContainerEngineeringModel.EngineeringModelSetup.Name,
+                   iteration.ContainerEngineeringModel.EngineeringModelSetup.ShortName,
+                   iteration.IterationSetup.IterationNumber,
+                   iteration.IterationSetup.Description,
+                   iteration.IterationSetup.FrozenOn
+                );
+            }
+
+            SendMessage(text);
+        }
+
 
         public void NotifyOther(Thing thing)
         {
