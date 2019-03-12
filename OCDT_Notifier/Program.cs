@@ -14,12 +14,12 @@ namespace OCDT_Notifier {
         /// <summary>
         /// The logger.
         /// </summary>
-        protected static new readonly Logger Logger = LogManager.GetCurrentClassLogger ();
+        protected static new readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         /// <summary>
         /// The configuration, as specified by the user.
         /// </summary>
-        public static Configuration configuration = new Configuration ();
+        public static Configuration configuration = new Configuration();
 
         protected MattermostTarget target;
 
@@ -31,12 +31,38 @@ namespace OCDT_Notifier {
         /// <summary>
         /// List of the latest checked revisions for all OCDT things
         /// </summary>
-        private Dictionary<Guid, int> allRevisions = new Dictionary<Guid, int> ();
+        private Dictionary<Guid, int> allRevisions = new Dictionary<Guid, int>();
 
         /// <summary>
         /// The list of the latest parsed revision for every Engineering Model
         /// </summary>
-        private Dictionary<Guid, int> modelRevisions = new Dictionary<Guid, int> ();
+        private Dictionary<Guid, int> modelRevisions = new Dictionary<Guid, int>();
+
+        /// <summary>
+        /// A list of older Thing copies, so that a comparison can be made
+        /// </summary>
+        private Dictionary<Guid, Thing> olderThings = new Dictionary<Guid, Thing>();
+
+        /// <summary>
+        /// The <see cref="ClassKind"/>s that can be cluttered and will be only shown when a
+        /// significant update (<see cref="interestingParameters"/>) has occurred to them.
+        /// Only works as long as the <see cref="Configuration.OutputType.ClearClutter"/> option
+        /// is true.
+        /// </summary>
+        private static ClassKind[] clutteredKinds = new ClassKind[] {
+            ClassKind.ElementDefinition,
+            ClassKind.ElementUsage,
+            ClassKind.EngineeringModel,
+            ClassKind.Iteration
+        };
+
+        // TODO: Add others, short name, categories, element definition
+        /// <summary>
+        /// Significant parameters for <see cref="clutteredKinds"/>
+        /// </summary>
+        private static String[] interestingParameters = new string[] {
+            "name", "definition", "owner", "shortName", "category"
+        };
 
         public OCDTNotifier ()
         {
@@ -99,6 +125,13 @@ namespace OCDT_Notifier {
 
                     // Add the thing's revision to the revision list
                     allRevisions [thing.Iid] = thing.RevisionNumber;
+
+                    // Store some older Things
+                    if (clutteredKinds.Contains(thing.ClassKind)) {
+                        // A shallow clone is enough to store underlying
+                        // lists as well
+                        olderThings[thing.Iid] = thing.CreateShallowClone();
+                    }
                 }
             }
 
@@ -151,14 +184,54 @@ namespace OCDT_Notifier {
                             Logger.Warn ("New update for {}", thing);
                             allRevisions [thing.Iid] = thing.RevisionNumber;
 
-                            // Add the Thing to the list, so it can be sent to the target
-                            if (!updatedThings.ContainsKey(thing.ClassKind)) {
-                                updatedThings [thing.ClassKind] = new List<Thing> ();
+                            // First, find out if we should notify about the thing
+                            bool addThingToList = false;
+                            if (configuration.Output.ClearClutter) {
+                               // Clear clutter is enabled, take attention
+                               if (changeKind != ChangeKind.Updated) {
+                                    // All "significant" changes pass
+                                    addThingToList = true;
+                               } else if (clutteredKinds.Contains(thing.ClassKind)) {
+                                    // Perform a comparison to see if the thing should be published
+                                    if (!olderThings.ContainsKey(thing.Iid)) {
+                                        // No "old thing" exists; probably new
+                                        addThingToList = true;
+                                    } else {
+                                        NativeDtoChangeSet changeSet = new NativeDtoChangeSet();
+                                        thing.DeriveNetChanges(olderThings[thing.Iid], changeSet);
+
+                                        // Find only "interesting" changes
+                                        addThingToList = changeSet.UpdateSection.FirstOrDefault().Value.Any(u => {
+                                            if (interestingParameters.Contains(u.Key)) {
+                                                Logger.Trace("Thing contains interesting parameter {}", u.Key);
+                                                return true;
+                                            } else {
+                                                return false;
+                                            }
+                                        });
+                                    }
+                                } else {
+                                    addThingToList = true;
+                               }
+                            } else {
+                                addThingToList = true;
                             }
-                            updatedThings [thing.ClassKind].Add (thing);
+
+                            // Add the Thing to the list, so it can be sent to the target
+                            if (addThingToList) {
+                                if (!updatedThings.ContainsKey(thing.ClassKind)) {
+                                    updatedThings[thing.ClassKind] = new List<Thing>();
+                                }
+                                updatedThings[thing.ClassKind].Add(thing);
+                            }
 
                             // Add the complementary data of the Thing
                             metadata [thing.Iid] = new Tuple<ChangeKind> (changeKind);
+
+                            // Store some older things
+                            if (thing.ClassKind == ClassKind.ElementDefinition || thing.ClassKind == ClassKind.ElementUsage) {
+                                olderThings[thing.Iid] = thing.CreateShallowClone();
+                            }
                         }
                     }
 
