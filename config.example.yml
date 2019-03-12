@@ -24,5 +24,7 @@ ocdt_notifier:
     profileIcons:
         COMMS: "https://upload.wikimedia.org/wikipedia/commons/7/7b/Satellite_dish_1_C-Band.jpg"
         EPS: "https://upload.wikimedia.org/wikipedia/commons/3/3b/Batteries.jpg"
+    # A piece of text to prepend to messages about publications
+    publicationPreamble: "**Important: A publication has taken place**"
   # Whether to enable some useful debugging functions
   debug: false

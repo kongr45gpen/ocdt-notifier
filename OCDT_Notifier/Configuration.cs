@@ -53,6 +53,12 @@ namespace OCDT_Notifier {
         public class TargetType {
             public string Hook { get; set; }
             public Dictionary<String, String> ProfileIcons { get; set; }
+            public string PublicationPreamble { get; set; }
+
+            public TargetType()
+            {
+                ProfileIcons = new Dictionary<string, string>();
+            }
         }
 
         /// <summary>
