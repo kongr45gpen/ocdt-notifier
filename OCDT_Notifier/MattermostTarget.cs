@@ -16,34 +16,56 @@ namespace OCDT_Notifier
 
         protected Uri hook;
 
-        public void NotifyParameterValueSet(List<ParameterValueSet> parameterValueSets, Dictionary<Guid, Tuple<ChangeKind>> metadata)
+        public void NotifyParameterValueSet(List<ParameterValueSetBase> parameterValueSets, Dictionary<Guid, Tuple<ChangeKind>> metadata)
         {
-            EngineeringModelSetup engineeringModelSetup = parameterValueSets[0].ContainerParameter.ContainerElementDefinition.ContainerIteration.ContainerEngineeringModel.EngineeringModelSetup;
+            EngineeringModelSetup engineeringModelSetup = parameterValueSets[0].DeriveParameter().ContainerElementDefinition.ContainerIteration.ContainerEngineeringModel.EngineeringModelSetup;
 
             // We assume the list is not empty
             var text = String.Format("#### {0} {1} – Parameter values\n", FormatClassKind(ClassKind.ParameterValueSet), engineeringModelSetup.Name);
             text += "|Domain|Type| Equipment  | Parameter | New value | Published |\n|:---:|:---:|---|:------:|:----|:----|\n";
 
-            foreach (ParameterValueSet parameterValueSet in parameterValueSets) {
-                ChangeKind changeKind = metadata[parameterValueSet.Iid].Item1;
+            foreach (ParameterValueSetBase parameterValueSetBase in parameterValueSets) {
+                ChangeKind changeKind = metadata[parameterValueSetBase.Iid].Item1;
 
-                Logger.Trace("Parameter: {}", parameterValueSet);
-                Logger.Trace("Param Owner: {}", parameterValueSet.DeriveOwner());
-                Logger.Trace("Param Element: {}", parameterValueSet.ContainerParameter.ContainerElementDefinition);
-                Logger.Trace("Param Path: {}", parameterValueSet.ContainerParameter.Path);
+                Logger.Trace("Parameter: {}", parameterValueSetBase.ToShortString());
+                Logger.Trace("Param Owner: {}", parameterValueSetBase.DeriveOwner().ShortName);
+                Logger.Trace("Param Element: {}", parameterValueSetBase.DerivedContainerElementDefinitionShortName);
+                Logger.Trace("Param Path: {}", parameterValueSetBase.Path);
 
-                text += String.Format("|{0}|{1}|**{2}** ({9})|**{3}**{8}|{4}{5}|{6}|\n",
-                    parameterValueSet.DeriveOwner().ShortName,
-                    FormatChangeKind(changeKind),
-                    parameterValueSet.ContainerParameter.ContainerElementDefinition.Name,
-                    parameterValueSet.ContainerParameter.ParameterType.Name,
-                    FormatParameter(parameterValueSet, parameterValueSet.ActualValue),
-                    parameterValueSet.ActualState == null ? "" : " (" + parameterValueSet.ActualState.ShortName + ")",
-                    FormatParameter(parameterValueSet, parameterValueSet.Published),
-                    parameterValueSet.ContainerParameter.GetParameterGroupPath(), // We don't actually show the group. It is shown on the parameter.
-                    parameterValueSet.ActualOption == null ? "" : " (" + parameterValueSet.ActualOption.ShortName + ")",
-                    parameterValueSet.ContainerParameter.ContainerElementDefinition.ShortName
-                    );
+
+                if (parameterValueSetBase.ClassKind == ClassKind.ParameterValueSet) {
+                    ParameterValueSet parameterValueSet = (ParameterValueSet)parameterValueSetBase;
+
+                    text += String.Format("|{0}|{1}|**{2}** ({9})|**{3}**{8}|{4}{5}|{6}|\n",
+                        parameterValueSet.DeriveOwner().ShortName,
+                        FormatChangeKind(changeKind),
+                        parameterValueSet.ContainerParameter.ContainerElementDefinition.Name,
+                        parameterValueSet.ContainerParameter.ParameterType.Name,
+                        FormatParameter(parameterValueSet, parameterValueSet.ActualValue),
+                        parameterValueSet.ActualState == null ? "" : " (" + parameterValueSet.ActualState.ShortName + ")",
+                        FormatParameter(parameterValueSet, parameterValueSet.Published),
+                        parameterValueSet.ContainerParameter.GetParameterGroupPath(), // We don't actually show the group. It is shown on the parameter.
+                        parameterValueSet.ActualOption == null ? "" : " (" + parameterValueSet.ActualOption.ShortName + ")",
+                        parameterValueSet.ContainerParameter.ContainerElementDefinition.ShortName
+                        );
+                } else {
+                    ParameterOverrideValueSet parameterValueSet = (ParameterOverrideValueSet)parameterValueSetBase;
+
+                    // We show ElementUsages and not ElementDefinitions for overriden parameters
+                    text += String.Format("|{0}|{10}{1}|* **{2}** ({9}) *|**{3}**{8}|{4}{5}|{6}|\n",
+                        parameterValueSet.DeriveOwner().ShortName,
+                        FormatChangeKind(changeKind),
+                        parameterValueSet.ContainerParameterOverride.ContainerElementUsage.Name,
+                        parameterValueSet.DeriveParameter().ParameterType.Name,
+                        FormatParameter(parameterValueSet, parameterValueSet.ActualValue),
+                        parameterValueSet.ActualState == null ? "" : " (" + parameterValueSet.ActualState.ShortName + ")",
+                        FormatParameter(parameterValueSet, parameterValueSet.Published),
+                        parameterValueSet.DeriveParameter().GetParameterGroupPath(), // We don't actually show the group. It is shown on the parameter.
+                        parameterValueSet.ActualOption == null ? "" : " (" + parameterValueSet.ActualOption.ShortName + ")",
+                        parameterValueSet.ContainerParameterOverride.ContainerElementUsage.ShortName,
+                        parameterValueSet.DeriveParameter().ExpectsOverride ? "" : ":exclamation:"
+                        );
+                }
             }
 
             SendMessage(text, parameterValueSets.First().Owner);
@@ -180,7 +202,7 @@ namespace OCDT_Notifier
                     if (paramBase.ClassKind == ClassKind.Parameter) {
                         Parameter parameter = (Parameter)paramBase;
                         foreach (ParameterValueSet parameterValueSet in parameter.ValueSet) {
-                            text += String.Format("|{0}|{1}|{2}|**{3}**| **{4}** |{5}|{6}|\n",
+                            text += String.Format("|{0}|{1}|**{2}**|**{3}**| {4} |{5}|{6}|\n",
                                   parameterValueSet.Owner.ShortName,
                                   FormatClassKind(parameterValueSet),
                                   parameter.ContainerElementDefinition.Name,
@@ -190,6 +212,22 @@ namespace OCDT_Notifier
                                   parameterValueSet.ValueSwitch
                                );
                         }
+                    } else if (paramBase.ClassKind == ClassKind.ParameterOverride) {
+                        ParameterOverride parameterOverride = (ParameterOverride)paramBase;
+                        Parameter parameter = parameterOverride.Parameter;
+                        foreach (ParameterOverrideValueSet parameterValueSet in parameterOverride.ValueSet) {
+                            text += String.Format("|{0}|{1}|* **{2}** *|**{3}**| {4} |{5}|{6}|\n",
+                                  parameterValueSet.Owner.ShortName,
+                                  FormatClassKind(parameterValueSet),
+                                  parameterOverride.ContainerElementUsage.Name,
+                                  parameter.ParameterType.Name,
+                                  FormatDependencies(parameterValueSet),
+                                  FormatParameter(parameterValueSet, parameterValueSet.Published),
+                                  parameterValueSet.ValueSwitch
+                               );
+                        }
+                    } else {
+                        Logger.Warn("Unknown publication parameter type {}", paramBase.ClassKind);
                     }
                 }
             }
@@ -240,14 +278,14 @@ namespace OCDT_Notifier
         /// <param name="values">The list of values (Actual, Published, etc.)</param>
         /// <param name="boldValues">Whether to embolden these parameters in Markdown</param>
         /// <returns>A Markdown string</returns>
-        protected String FormatParameter(ParameterValueSet parameterValueSet, SmartArray<String> values, bool boldValues = true)
+        protected String FormatParameter(ParameterValueSetBase parameterValueSet, SmartArray<String> values, bool boldValues = true)
         {
             
             return String.Join(", ", values.Select((v, k) => {
                 MeasurementScale scale;
 
-                if (parameterValueSet.ContainerParameter.IsCompoundParameter) {
-                    CompoundParameterType parameterType = (CompoundParameterType)(parameterValueSet.ContainerParameter.ParameterType);
+                if (parameterValueSet.DeriveParameter().IsCompoundParameter) {
+                    CompoundParameterType parameterType = (CompoundParameterType)(parameterValueSet.DeriveParameter().ParameterType);
                     scale = parameterType.Component[k].Scale;
                 } else {
                     scale = parameterValueSet.DeriveMeasurementScale();
@@ -277,11 +315,24 @@ namespace OCDT_Notifier
                     ParameterValueSet parameterValueSet = (ParameterValueSet)thing;
                     Parameter parameter = parameterValueSet.ContainerParameter;
 
-                    text += String.Format("|{0}|{1}||**{3}**| **{4}** |{5}|{6}|\n",
+                    text += String.Format("|{0}|{1}||**{3}**| {4} |{5}|{6}|\n",
                           parameterValueSet.Owner.ShortName,
                           FormatClassKind(thing),
                           parameter.ContainerElementDefinition.Name,
-                          parameter.IsStateDependent ? " " : parameter.ParameterType.Name,
+                          (parameter.IsStateDependent || parameter.IsOptionDependent) ? " " : parameter.ParameterType.Name,
+                          FormatDependencies(parameterValueSet),
+                          FormatParameter(parameterValueSet, parameterValueSet.Published),
+                          parameterValueSet.ValueSwitch
+                       );
+                } else if (thing.ClassKind == ClassKind.ParameterOverrideValueSet) {
+                    ParameterOverrideValueSet parameterValueSet = (ParameterOverrideValueSet)thing;
+                    Parameter parameter = parameterValueSet.DeriveParameter();
+
+                    text += String.Format("|{0}|{1}||* **{3}** *| {4} |{5}|{6}|\n",
+                          parameterValueSet.Owner.ShortName,
+                          FormatClassKind(thing),
+                          parameterValueSet.ContainerParameterOverride.ContainerElementUsage.Name,
+                          (parameter.IsStateDependent || parameter.IsOptionDependent) ? " " : parameter.ParameterType.Name,
                           FormatDependencies(parameterValueSet),
                           FormatParameter(parameterValueSet, parameterValueSet.Published),
                           parameterValueSet.ValueSwitch
@@ -301,6 +352,22 @@ namespace OCDT_Notifier
                           parameter.ParameterType.Name,
                           FormatDependencies(parameter)
                        );
+                } else if (thing.ClassKind == ClassKind.ParameterOverride) {
+                    ParameterOverride parameterOverride = (ParameterOverride)thing;
+                    Parameter parameter = parameterOverride.Parameter;
+
+                    // We don't want to bloat double entries with non-state-dependent parameters
+                    if (!parameter.IsStateDependent && !parameter.IsOptionDependent) {
+                        return;
+                    }
+
+                    text += String.Format("|{0}|{1}||* **{3}** *|{4}|||\n",
+                          parameter.Owner.ShortName,
+                          FormatClassKind(thing),
+                          parameterOverride.ContainerElementUsage.Name,
+                          parameter.ParameterType.Name,
+                          FormatDependencies(parameter)
+                       );
                 } else if (thing.ClassKind == ClassKind.ElementDefinition) {
                     ElementDefinition elementDefinition = (ElementDefinition)thing;
 
@@ -308,6 +375,14 @@ namespace OCDT_Notifier
                           elementDefinition.Owner.ShortName,
                           FormatClassKind(thing),
                           elementDefinition.Name
+                       );
+                } else if (thing.ClassKind == ClassKind.ElementUsage) {
+                    ElementUsage elementUsage = (ElementUsage)thing;
+
+                    text += String.Format("||||||||\n|{0}|{1}|**{2}**|||||\n",
+                          elementUsage.Owner.ShortName,
+                          FormatClassKind(thing),
+                          elementUsage.Name
                        );
                 } else if (thing.ClassKind == ClassKind.ParameterGroup) {
                     ParameterGroup parameterGroup = (ParameterGroup)thing;
@@ -351,9 +426,9 @@ namespace OCDT_Notifier
         /// <summary>
         /// Get a string returning the actual state and option of a parameter value set
         /// </summary>
-        protected String FormatDependencies(ParameterValueSet parameterValueSet)
+        protected String FormatDependencies(ParameterValueSetBase parameterValueSet)
         {
-            Parameter parameter = parameterValueSet.ContainerParameter;
+            Parameter parameter = parameterValueSet.DeriveParameter();
 
             if (parameter.IsOptionDependent && parameter.IsStateDependent) {
                 return String.Format("{0}, {1}",
@@ -382,13 +457,13 @@ namespace OCDT_Notifier
         /// <returns></returns>
         protected String FormatClassKind(Thing thing)
         {
-            if (thing.ClassKind == ClassKind.ParameterValueSet) {
+            if (thing.ClassKind == ClassKind.ParameterValueSet || thing.ClassKind == ClassKind.ParameterOverrideValueSet) {
                 // Add extra icons for state- and option-dependent parameters
                 var ret = ":gear:";
-                if (((ParameterValueSet)thing).ContainerParameter.IsStateDependent) {
+                if (((ParameterValueSetBase)thing).DeriveParameter().IsStateDependent) {
                     ret += ":hammer_and_pick:";
                 }
-                if (((ParameterValueSet)thing).ContainerParameter.IsOptionDependent) {
+                if (((ParameterValueSetBase)thing).DeriveParameter().IsOptionDependent) {
                     ret += ":control_knobs:";
                 }
                 return ret;
@@ -406,9 +481,12 @@ namespace OCDT_Notifier
         protected String FormatClassKind(ClassKind classKind)
         {
             switch(classKind) {
+                case ClassKind.ParameterOverride:
+                    return ":fountain_pen:";
                 case ClassKind.Parameter:
                     return ":level_slider:";
                 case ClassKind.ParameterValueSet:
+                case ClassKind.ParameterOverrideValueSet:
                     return ":gear:";
                 case ClassKind.ElementDefinition:
                     return ":package:";

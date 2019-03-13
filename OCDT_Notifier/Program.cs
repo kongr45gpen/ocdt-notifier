@@ -45,7 +45,7 @@ namespace OCDT_Notifier {
 
         /// <summary>
         /// The <see cref="ClassKind"/>s that can be cluttered and will be only shown when a
-        /// significant update (<see cref="interestingParameters"/>) has occurred to them.
+        /// significant update (<see cref="interestingProperties"/>) has occurred to them.
         /// Only works as long as the <see cref="Configuration.OutputType.ClearClutter"/> option
         /// is true.
         /// </summary>
@@ -53,15 +53,16 @@ namespace OCDT_Notifier {
             ClassKind.ElementDefinition,
             ClassKind.ElementUsage,
             ClassKind.EngineeringModel,
-            ClassKind.Iteration
+            ClassKind.Iteration,
+            ClassKind.Parameter
         };
 
-        // TODO: Add others, short name, categories, element definition
         /// <summary>
-        /// Significant parameters for <see cref="clutteredKinds"/>
+        /// Significant properties for <see cref="clutteredKinds"/>
         /// </summary>
-        private static String[] interestingParameters = new string[] {
-            "name", "definition", "owner", "shortName", "category"
+        private static String[] interestingProperties = new string[] {
+            "name", "definition", "owner", "shortName", "category",
+            "group", "isOptionDependent", "stateDependence"
         };
 
         public OCDTNotifier ()
@@ -188,7 +189,7 @@ namespace OCDT_Notifier {
                         Thing thing = changedDomainObject.Key;
 
                         // Make sure that the thing has been updated
-                        Logger.Warn ("New update for {}", thing);
+                        Logger.Info ("New update for {}", thing.ToShortString());
                         allRevisions [thing.Iid] = thing.RevisionNumber;
 
                         // First, find out if we should notify about the thing
@@ -208,14 +209,19 @@ namespace OCDT_Notifier {
                                     thing.DeriveNetChanges(olderThings[thing.Iid], changeSet);
 
                                     // Find only "interesting" changes
-                                    addThingToList = changeSet.UpdateSection.FirstOrDefault().Value.Any(u => {
-                                        if (interestingParameters.Contains(u.Key)) {
-                                            Logger.Trace("Thing contains interesting parameter {}", u.Key);
-                                            return true;
-                                        } else {
-                                            return false;
-                                        }
-                                    });
+                                    if (changeSet.UpdateSection.IsEmpty()) {
+                                        // Nothing changed! Something was added or deleted. Ignore this.
+                                        addThingToList = false;
+                                    } else {
+                                        addThingToList = changeSet.UpdateSection.FirstOrDefault().Value.Any(u => {
+                                            if (interestingProperties.Contains(u.Key)) {
+                                                Logger.Trace("Thing contains interesting parameter {}", u.Key);
+                                                return true;
+                                            } else {
+                                                return false;
+                                            }
+                                        });
+                                    }
                                 }
                             } else {
                                 addThingToList = true;
@@ -224,12 +230,19 @@ namespace OCDT_Notifier {
                             addThingToList = true;
                         }
 
+                        // Infer the Thing's ClassKind
+                        ClassKind classKind = thing.ClassKind;
+                        if (thing.GetType().IsSubclassOf(typeof(ParameterValueSetBase))) {
+                            // Group sets & overrides together
+                            classKind = ClassKind.ParameterValueSetBase;
+                        }
+
                         // Add the Thing to the list, so it can be sent to the target
                         if (addThingToList) {
-                            if (!updatedThings.ContainsKey(thing.ClassKind)) {
-                                updatedThings[thing.ClassKind] = new List<Thing>();
+                            if (!updatedThings.ContainsKey(classKind)) {
+                                updatedThings[classKind] = new List<Thing>();
                             }
-                            updatedThings[thing.ClassKind].Add(thing);
+                            updatedThings[classKind].Add(thing);
                         }
 
                         // Add the complementary data of the Thing
@@ -251,9 +264,9 @@ namespace OCDT_Notifier {
                         Logger.Info ("Detected {} change", entry.Key);
 
                         switch (entry.Key) {
-                        case ClassKind.ParameterValueSet: {
+                        case ClassKind.ParameterValueSetBase: {
                                 // A parameter value was set
-                                List<ParameterValueSet> list = entry.Value.ConvertAll (x => (ParameterValueSet)x);
+                                List<ParameterValueSetBase> list = entry.Value.ConvertAll (x => (ParameterValueSetBase)x);
                                 // Group by domain of expertise, send a different message for each domain
                                 foreach (var sublist in SplitDomainsOfExpertise (list, u => u.Owner)) {
                                     var newSublist = sublist;
@@ -263,11 +276,11 @@ namespace OCDT_Notifier {
                                        // Filter some parameters
                                         newSublist = sublist.FindAll (s => {
                                             // The Guid of the corresponding Element Definition
-                                            var element = s.ContainerParameter.ContainerElementDefinition.Iid;
+                                            var element = s.DeriveParameter().ContainerElementDefinition.Iid;
 
                                             // Don't show parameter changes after their publication
                                             if (s.ActualValue.ContainsSameItemsAs(s.Published)) {
-                                                if (publishedParameters.Contains(s.ContainerParameter.Iid)) {
+                                                if (publishedParameters.Contains(s.DeriveParameter().Iid)) {
                                                     // The parameter has been published; Don't show it.
                                                     return false;
                                                 }
@@ -332,9 +345,10 @@ namespace OCDT_Notifier {
 
                                 break;
                             }
-                                //default:
-                                //    target.NotifyOther (thing);
-                                //    break;
+                        default:
+                            Logger.Warn("Received {} Things of unimplemented type {}", entry.Value.Count, entry.Key);
+                            //target.NotifyOther (thing);
+                            break;
                         }
                     }
                 }
