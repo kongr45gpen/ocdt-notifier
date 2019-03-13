@@ -32,15 +32,14 @@ namespace OCDT_Notifier
                 Logger.Trace("Param Element: {}", parameterValueSet.ContainerParameter.ContainerElementDefinition);
                 Logger.Trace("Param Path: {}", parameterValueSet.ContainerParameter.Path);
 
-                text += String.Format("|{0}|{1}|**{2}** ({10})|**{3}**{9}|**{4}** {5}{6}|{7} {5}|\n",
+                text += String.Format("|{0}|{1}|**{2}** ({9})|**{3}**{8}|{4}{5}|{6}|\n",
                     parameterValueSet.DeriveOwner().ShortName,
                     FormatChangeKind(changeKind),
                     parameterValueSet.ContainerParameter.ContainerElementDefinition.Name,
                     parameterValueSet.ContainerParameter.ParameterType.Name,
-                    parameterValueSet.ActualValue[0],
-                    parameterValueSet.DeriveMeasurementScale() != null ? parameterValueSet.DeriveMeasurementScale().ShortName : "",
+                    FormatParameter(parameterValueSet, parameterValueSet.ActualValue),
                     parameterValueSet.ActualState == null ? "" : " (" + parameterValueSet.ActualState.ShortName + ")",
-                    parameterValueSet.Published[0],
+                    FormatParameter(parameterValueSet, parameterValueSet.Published),
                     parameterValueSet.ContainerParameter.GetParameterGroupPath(), // We don't actually show the group. It is shown on the parameter.
                     parameterValueSet.ActualOption == null ? "" : " (" + parameterValueSet.ActualOption.ShortName + ")",
                     parameterValueSet.ContainerParameter.ContainerElementDefinition.ShortName
@@ -181,14 +180,13 @@ namespace OCDT_Notifier
                     if (paramBase.ClassKind == ClassKind.Parameter) {
                         Parameter parameter = (Parameter)paramBase;
                         foreach (ParameterValueSet parameterValueSet in parameter.ValueSet) {
-                            text += String.Format("|{0}|{1}|{2}|**{3}**| **{4}** |**{5}** {6}|{7}|\n",
+                            text += String.Format("|{0}|{1}|{2}|**{3}**| **{4}** |{5}|{6}|\n",
                                   parameterValueSet.Owner.ShortName,
                                   FormatClassKind(parameterValueSet),
                                   parameter.ContainerElementDefinition.Name,
                                   parameter.ParameterType.Name,
                                   FormatDependencies(parameterValueSet),
-                                  parameterValueSet.Published.First(),
-                                  parameterValueSet.DeriveMeasurementScale()?.ShortName,
+                                  FormatParameter(parameterValueSet, parameterValueSet.Published),
                                   parameterValueSet.ValueSwitch
                                );
                         }
@@ -235,6 +233,27 @@ namespace OCDT_Notifier
             SendMessage(text);
         }
 
+        protected String FormatParameter(ParameterValueSet parameterValueSet, SmartArray<String> values, bool boldValues = true)
+        {
+            
+            return String.Join(", ", values.Select((v, k) => {
+                MeasurementScale scale;
+
+                if (parameterValueSet.ContainerParameter.IsCompoundParameter) {
+                    CompoundParameterType parameterType = (CompoundParameterType)(parameterValueSet.ContainerParameter.ParameterType);
+                    scale = parameterType.Component[k].Scale;
+                } else {
+                    scale = parameterValueSet.DeriveMeasurementScale();
+                }
+
+                if (boldValues) {
+                    return String.Format("**{0}** {1}", v, scale?.ShortName);
+                } else {
+                    return String.Format("{0} {1}", v, scale?.ShortName);
+                }
+            }));
+        }
+
         /// <summary>
         /// Draws the full tree of a list of ElementBases in Markdown.
         /// </summary>
@@ -251,14 +270,13 @@ namespace OCDT_Notifier
                     ParameterValueSet parameterValueSet = (ParameterValueSet)thing;
                     Parameter parameter = parameterValueSet.ContainerParameter;
 
-                    text += String.Format("|{0}|{1}||**{3}**| **{4}** |**{5}** {6}|{7}|\n",
+                    text += String.Format("|{0}|{1}||**{3}**| **{4}** |{5}|{6}|\n",
                           parameterValueSet.Owner.ShortName,
                           FormatClassKind(thing),
                           parameter.ContainerElementDefinition.Name,
                           parameter.IsStateDependent ? " " : parameter.ParameterType.Name,
                           FormatDependencies(parameterValueSet),
-                          parameterValueSet.Published.First(),
-                          parameterValueSet.DeriveMeasurementScale()?.ShortName,
+                          FormatParameter(parameterValueSet, parameterValueSet.Published),
                           parameterValueSet.ValueSwitch
                        );
                 } else if (thing.ClassKind == ClassKind.Parameter) {
