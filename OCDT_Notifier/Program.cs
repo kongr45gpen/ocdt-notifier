@@ -306,13 +306,23 @@ namespace OCDT_Notifier {
 
                                 break;
                             }
-                        case ClassKind.Publication: {
-                                foreach (var publication in entry.Value) {
-                                    target.NotifyPublication((Publication) publication, metadata);
+                        case ClassKind.Parameter: {
+                                // A parameter (without its value) was edited
+                                List<Parameter> list = entry.Value.ConvertAll(x => (Parameter)x);
+
+                                foreach (var sublist in SplitDomainsOfExpertise(list, u => u.Owner)) {
+                                    target.NotifyParameter(sublist, metadata);
                                 }
 
                                 break;
                             }
+                        case ClassKind.Publication: {
+                            foreach (var publication in entry.Value) {
+                                target.NotifyPublication((Publication) publication, metadata);
+                            }
+
+                            break;
+                        }
                         case ClassKind.EngineeringModel:
                             break;
                         case ClassKind.Iteration: {

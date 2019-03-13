@@ -50,6 +50,35 @@ namespace OCDT_Notifier
             SendMessage(text, parameterValueSets.First().Owner);
         }
 
+        public void NotifyParameter(List<Parameter> parameters, Dictionary<Guid, Tuple<ChangeKind>> metadata)
+        {
+            EngineeringModelSetup engineeringModelSetup = parameters[0].ContainerElementDefinition.ContainerIteration.ContainerEngineeringModel.EngineeringModelSetup;
+
+            // We assume the list is not empty
+            var text = String.Format("#### {0} {1} – Parameters\n", FormatClassKind(ClassKind.Parameter), engineeringModelSetup.Name);
+            text += "|Domain|Type| Equipment  | Group path | Parameter | StD | OptD | Scale |\n|:---:|:---:|---|:---|:---|:---:|:---:|:---|\n";
+
+            foreach (Parameter parameter in parameters) {
+                ChangeKind changeKind = metadata[parameter.Iid].Item1;
+
+                text += String.Format("|{0}|{1}|**{2}** ({3})|`{4}`|**{5}** ({6})|{9}|{10}|{7} ({8})|\n",
+                    parameter.Owner.ShortName,
+                    FormatChangeKind(changeKind),
+                    parameter.ContainerElementDefinition.Name,
+                    parameter.ContainerElementDefinition.ShortName,
+                    parameter.Group != null ? parameter.GetParameterGroupPath() : " ",
+                    parameter.ParameterType.Name,
+                    parameter.ParameterType.ShortName,
+                    parameter.Scale.Name,
+                    parameter.Scale.ShortName,
+                    parameter.IsStateDependent ? parameter.StateDependence.Name : "",
+                    parameter.IsOptionDependent ? "✓" : ""
+                    );
+            }
+
+            SendMessage(text, parameters.First().Owner);
+        }
+
         public void NotifyElementDefinition(List<ElementDefinition> elementDefinitions, Dictionary<Guid, Tuple<ChangeKind>> metadata)
         {
             EngineeringModelSetup engineeringModelSetup = elementDefinitions[0].ContainerIteration.ContainerEngineeringModel.EngineeringModelSetup;
