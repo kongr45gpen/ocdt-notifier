@@ -233,6 +233,13 @@ namespace OCDT_Notifier
             SendMessage(text);
         }
 
+        /// <summary>
+        /// Format a parameter with its sub-parameters and measurement scales
+        /// </summary>
+        /// <param name="parameterValueSet">The ParameterValueSet</param>
+        /// <param name="values">The list of values (Actual, Published, etc.)</param>
+        /// <param name="boldValues">Whether to embolden these parameters in Markdown</param>
+        /// <returns>A Markdown string</returns>
         protected String FormatParameter(ParameterValueSet parameterValueSet, SmartArray<String> values, bool boldValues = true)
         {
             
@@ -318,6 +325,9 @@ namespace OCDT_Notifier
             return text;
         }
 
+        /// <summary>
+        /// Get a string returning the state list and option dependence of a Parameter
+        /// </summary>
         protected String FormatDependencies(Parameter parameter)
         {
             if (parameter.IsOptionDependent && parameter.IsStateDependent) {
@@ -338,6 +348,9 @@ namespace OCDT_Notifier
             }
         }
 
+        /// <summary>
+        /// Get a string returning the actual state and option of a parameter value set
+        /// </summary>
         protected String FormatDependencies(ParameterValueSet parameterValueSet)
         {
             Parameter parameter = parameterValueSet.ContainerParameter;
