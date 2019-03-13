@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace OCDT_Notifier.Utilities
 {
-    class ThingTreeNode : IEnumerable<ThingTreeNode>
+    public class ThingTreeNode : IEnumerable<ThingTreeNode>
     {
         /// <summary>
         /// The logger.
@@ -102,7 +102,16 @@ namespace OCDT_Notifier.Utilities
                     break;
                 }
 
-                currentContainer = currentContainer.Container;
+                // TODO: Use a less hacky way to determine this.
+                ParameterGroup group = (OCDTNotifier.configuration.Target.DisplayGroupsInTrees) // Read config option
+                    ? (ParameterGroup)currentContainer.GetType().GetProperty("Group")?.GetValue(currentContainer)
+                    : null;
+                if (group != null) {
+                    // This object belongs in a ParameterGroup. Use that as its parent.
+                    currentContainer = group;
+                } else {
+                    currentContainer = currentContainer.Container;
+                }
             }
 
             // Starting from top to bottom, add the Things to the tree

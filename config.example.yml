@@ -26,5 +26,9 @@ ocdt_notifier:
         EPS: "https://upload.wikimedia.org/wikipedia/commons/3/3b/Batteries.jpg"
     # A piece of text to prepend to messages about publications
     publicationPreamble: "**Important: A publication has taken place**"
+    # Whether to display publication value lists as trees, instead of just listing them sequentially
+    displayTrees: true
+    # Whether to display Parameter Groups on publication trees
+    displayGroupsInTrees: true
   # Whether to enable some useful debugging functions
   debug: false

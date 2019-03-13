@@ -153,76 +153,48 @@ namespace OCDT_Notifier
                 publication.Domain.Aggregate("", (s, v) => s += ((s == "") ? "" : ", ") + v.ShortName)
             );
 
-            text += "|DOE|Typ.| Element | Parameter | State | Published Value | Switch |\n|:---:|:---:|-----|------|----|---|:---:|\n";
+            if (OCDTNotifier.configuration.Target.DisplayTrees) {
+                ThingTreeNode publicationTree = new ThingTreeNode(null);
 
-            ThingTreeNode publicationTree = new ThingTreeNode(null);
+                foreach (ParameterOrOverrideBase paramBase in publication.PublishedParameter) {
+                    ElementDefinition elementDefinition = paramBase.GetContainerElementDefinition();
 
-            foreach (ParameterOrOverrideBase paramBase in publication.PublishedParameter) {
-                ElementDefinition elementDefinition = paramBase.GetContainerElementDefinition();
-
-                if (paramBase.ClassKind == ClassKind.Parameter) {
-                    foreach (ParameterValueSet t in ((Parameter)paramBase).ValueSet) {
-                        publicationTree.AddThingAndItsContainers(t);
+                    if (paramBase.ClassKind == ClassKind.Parameter) {
+                        foreach (ParameterValueSet t in ((Parameter)paramBase).ValueSet) {
+                            publicationTree.AddThingAndItsContainers(t);
+                        }
+                    } else if (paramBase.ClassKind == ClassKind.ParameterOverride) {
+                        foreach (ParameterOverrideValueSet t in ((ParameterOverride)paramBase).ValueSet) {
+                            publicationTree.AddThingAndItsContainers(t);
+                        }
                     }
-                } else if (paramBase.ClassKind == ClassKind.ParameterOverride) {
-                    foreach (ParameterOverrideValueSet t in ((ParameterOverride)paramBase).ValueSet) {
-                        publicationTree.AddThingAndItsContainers(t);
+                }
+
+                text += DesignFullTree(publicationTree);
+            } else {
+                // Displaying clean values
+                text += "|DOE|Typ.| Element | Parameter | State | Published Value | Switch |\n";
+                text += "|:---:|:---:|-----|------|----|---|:---:|\n";
+
+                foreach (ParameterOrOverrideBase paramBase in publication.PublishedParameter) {
+                    // Are we Parameter or ParameterOverride?
+                    if (paramBase.ClassKind == ClassKind.Parameter) {
+                        Parameter parameter = (Parameter)paramBase;
+                        foreach (ParameterValueSet parameterValueSet in parameter.ValueSet) {
+                            text += String.Format("|{0}|{1}|{2}|**{3}**| **{4}** |**{5}** {6}|{7}|\n",
+                                  parameterValueSet.Owner.ShortName,
+                                  FormatClassKind(parameterValueSet),
+                                  parameter.ContainerElementDefinition.Name,
+                                  parameter.ParameterType.Name,
+                                  FormatDependencies(parameterValueSet),
+                                  parameterValueSet.Published.First(),
+                                  parameterValueSet.DeriveMeasurementScale()?.ShortName,
+                                  parameterValueSet.ValueSwitch
+                               );
+                        }
                     }
                 }
             }
-
-            publicationTree.Traverse(thing => {
-                if (thing.ClassKind == ClassKind.ParameterValueSet) {
-                    ParameterValueSet parameterValueSet = (ParameterValueSet)thing;
-                    Parameter parameter = parameterValueSet.ContainerParameter;
-
-                    text += String.Format("|{0}|{1}||**{3}**| **{4}** |**{5}** {6}|{7}|\n",
-                          parameterValueSet.Owner.ShortName,
-                          FormatClassKind(thing),
-                          parameter.ContainerElementDefinition.Name,
-                          parameter.IsStateDependent ? " " : parameter.ParameterType.Name,
-                          parameterValueSet.ActualState == null ? " " : parameterValueSet.ActualState.Name,
-                          parameterValueSet.Published.First(),
-                          parameterValueSet.DeriveMeasurementScale().ShortName,
-                          parameterValueSet.ValueSwitch
-                       );
-                } else if (thing.ClassKind == ClassKind.Parameter) {
-                    Parameter parameter = (Parameter)thing;
-
-                    // We don't want to bloat double entries with non-state-dependent parameters
-                    if (!parameter.IsStateDependent) {
-                        return;
-                    }
-
-                    text += String.Format("|{0}|{1}||**{3}**|{4} ({5})|||\n",
-                          parameter.Owner.ShortName,
-                          FormatClassKind(thing),
-                          parameter.ContainerElementDefinition.Name,
-                          parameter.ParameterType.Name,
-                          parameter.StateDependence.Name,
-                          parameter.StateDependence.ShortName
-                       );
-                } else if (thing.ClassKind == ClassKind.ElementDefinition) {
-                    ElementDefinition elementDefinition = (ElementDefinition)thing;
-
-                    text += String.Format("||||||||\n|{0}|{1}|**{2}**|||||\n",
-                          elementDefinition.Owner.ShortName,
-                          FormatClassKind(thing),
-                          elementDefinition.Name
-                       );
-                } else if (thing.ClassKind == ClassKind.ParameterGroup) {
-                    ParameterGroup parameterGroup = (ParameterGroup)thing;
-
-                    text += String.Format("|{0}|{1}||**{2}**||||\n",
-                          "", // Parameter groups don't have Owners
-                          FormatClassKind(thing),
-                          parameterGroup.Name
-                       );
-                } else {
-                    Logger.Warn("Found unexpected container {} while traversing tree", thing.ClassKind);
-                }
-            });
-
 
             SendMessage(text);
         }
@@ -263,18 +235,144 @@ namespace OCDT_Notifier
             SendMessage(text);
         }
 
-        private String FormatClassKind(Thing thing)
+        /// <summary>
+        /// Draws the full tree of a list of ElementBases in Markdown.
+        /// </summary>
+        /// <param name="rootNode">The root node of a tree containing <see cref="ElementBase"/>s.</param>
+        /// <returns>A markdown table with its heading.</returns>
+        protected String DesignFullTree(ThingTreeNode rootNode)
+        {
+            // The table heading
+            String text = "|DOE|Typ.| Element | Parameter | State | Published Value | Switch |\n";
+            text += "|:---:|:---:|-----|------|----|---|:---:|\n";
+
+            rootNode.Traverse(thing => {
+                if (thing.ClassKind == ClassKind.ParameterValueSet) {
+                    ParameterValueSet parameterValueSet = (ParameterValueSet)thing;
+                    Parameter parameter = parameterValueSet.ContainerParameter;
+
+                    text += String.Format("|{0}|{1}||**{3}**| **{4}** |**{5}** {6}|{7}|\n",
+                          parameterValueSet.Owner.ShortName,
+                          FormatClassKind(thing),
+                          parameter.ContainerElementDefinition.Name,
+                          parameter.IsStateDependent ? " " : parameter.ParameterType.Name,
+                          FormatDependencies(parameterValueSet),
+                          parameterValueSet.Published.First(),
+                          parameterValueSet.DeriveMeasurementScale()?.ShortName,
+                          parameterValueSet.ValueSwitch
+                       );
+                } else if (thing.ClassKind == ClassKind.Parameter) {
+                    Parameter parameter = (Parameter)thing;
+
+                    // We don't want to bloat double entries with non-state-dependent parameters
+                    if (!parameter.IsStateDependent && !parameter.IsOptionDependent) {
+                        return;
+                    }
+
+                    text += String.Format("|{0}|{1}||**{3}**|{4}|||\n",
+                          parameter.Owner.ShortName,
+                          FormatClassKind(thing),
+                          parameter.ContainerElementDefinition.Name,
+                          parameter.ParameterType.Name,
+                          FormatDependencies(parameter)
+                       );
+                } else if (thing.ClassKind == ClassKind.ElementDefinition) {
+                    ElementDefinition elementDefinition = (ElementDefinition)thing;
+
+                    text += String.Format("||||||||\n|{0}|{1}|**{2}**|||||\n",
+                          elementDefinition.Owner.ShortName,
+                          FormatClassKind(thing),
+                          elementDefinition.Name
+                       );
+                } else if (thing.ClassKind == ClassKind.ParameterGroup) {
+                    ParameterGroup parameterGroup = (ParameterGroup)thing;
+
+                    text += String.Format("|{0}|{1}||{2}||||\n",
+                          "", // Parameter groups don't have Owners
+                          FormatClassKind(thing),
+                          parameterGroup.Name
+                       );
+                } else {
+                    Logger.Warn("Found unexpected container {} while traversing tree", thing.ClassKind);
+                }
+            });
+
+            return text;
+        }
+
+        protected String FormatDependencies(Parameter parameter)
+        {
+            if (parameter.IsOptionDependent && parameter.IsStateDependent) {
+                return String.Format("{2}  {0}",
+                    parameter.StateDependence.Name,
+                    parameter.StateDependence.ShortName,
+                    FormatClassKind(ClassKind.Option)
+                );
+            } else if (parameter.IsStateDependent) {
+                return String.Format("{0}",
+                    parameter.StateDependence.Name,
+                    parameter.StateDependence.ShortName
+                );
+            } else if (parameter.IsOptionDependent) {
+                return FormatClassKind(ClassKind.Option);
+            } else {
+                return " ";
+            }
+        }
+
+        protected String FormatDependencies(ParameterValueSet parameterValueSet)
+        {
+            Parameter parameter = parameterValueSet.ContainerParameter;
+
+            if (parameter.IsOptionDependent && parameter.IsStateDependent) {
+                return String.Format("{0}, {1}",
+                    parameterValueSet.ActualState.Name,
+                    parameterValueSet.ActualOption.Name
+                );
+            } else if (parameter.IsStateDependent) {
+                return String.Format("{0}",
+                    parameterValueSet.ActualState.Name
+                );
+            } else if (parameter.IsOptionDependent) {
+                return String.Format("{0}",
+                    parameterValueSet.ActualOption.Name
+                );
+            } else {
+                return " ";
+            }
+        }
+
+        /// <summary>
+        /// Return a prettified Markdown string corresponding to the provided Thing, and
+        /// mostly its <see cref="ClassKind"/>.
+        /// Usually an emoji or an image.
+        /// </summary>
+        /// <param name="thing"></param>
+        /// <returns></returns>
+        protected String FormatClassKind(Thing thing)
         {
             if (thing.ClassKind == ClassKind.ParameterValueSet) {
+                // Add extra icons for state- and option-dependent parameters
+                var ret = ":gear:";
                 if (((ParameterValueSet)thing).ContainerParameter.IsStateDependent) {
-                    return ":gear::hammer_and_pick:";
+                    ret += ":hammer_and_pick:";
                 }
+                if (((ParameterValueSet)thing).ContainerParameter.IsOptionDependent) {
+                    ret += ":control_knobs:";
+                }
+                return ret;
             }
 
             return FormatClassKind(thing.ClassKind);
         }
 
-        private String FormatClassKind(ClassKind classKind)
+        /// <summary>
+        /// Return a prettified Markdown string corresponding to the provided ClassKind.
+        /// Usually an emoji or an image.
+        /// </summary>
+        /// <param name="thing"></param>
+        /// <returns></returns>
+        protected String FormatClassKind(ClassKind classKind)
         {
             switch(classKind) {
                 case ClassKind.Parameter:
@@ -285,6 +383,8 @@ namespace OCDT_Notifier
                     return ":package:";
                 case ClassKind.ParameterGroup:
                     return ":open_file_folder:";
+                case ClassKind.Option:
+                    return ":control_knobs:";
                 case ClassKind.ElementUsage:
                     return ":arrow_lower_right: :package:";
                 default:
@@ -292,7 +392,13 @@ namespace OCDT_Notifier
             }
         }
 
-        private String FormatChangeKind(ChangeKind changeKind)
+        /// <summary>
+        /// Return a prettified Markdown string corresponding to the provided ChangeKind.
+        /// Usually an emoji or an image.
+        /// </summary>
+        /// <param name="thing"></param>
+        /// <returns></returns>
+        protected String FormatChangeKind(ChangeKind changeKind)
         {
             switch(changeKind) {
             case ChangeKind.Added:
@@ -312,7 +418,7 @@ namespace OCDT_Notifier
         /// Sends a post to the Mattermost channel
         /// </summary>
         /// <param name="message">The markdown-formatted message to send</param>
-        private void SendMessage(String message, DomainOfExpertise domain = null)
+        protected void SendMessage(String message, DomainOfExpertise domain = null)
         {
             SendCustomMessage (new {
                 text = message,
@@ -342,7 +448,7 @@ namespace OCDT_Notifier
         /// </summary>
         /// <param name="domainOfExpertise">A domain of expertise, or null</param>
         /// <returns>The URL of the image, or "" on failure</returns>
-        private String GetDomainImage(DomainOfExpertise domainOfExpertise)
+        protected String GetDomainImage(DomainOfExpertise domainOfExpertise)
         {
             if (domainOfExpertise == null) {
                 return "";

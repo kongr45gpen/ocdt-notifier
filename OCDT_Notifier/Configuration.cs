@@ -54,6 +54,8 @@ namespace OCDT_Notifier {
             public string Hook { get; set; }
             public Dictionary<String, String> ProfileIcons { get; set; }
             public string PublicationPreamble { get; set; }
+            public bool DisplayTrees { get; set; }
+            public bool DisplayGroupsInTrees { get; set; }
 
             public TargetType()
             {
