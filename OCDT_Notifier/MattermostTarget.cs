@@ -100,6 +100,37 @@ namespace OCDT_Notifier
             SendMessage(text, parameters.First().Owner);
         }
 
+        public void NotifyParameterOverride(List<ParameterOverride> parameterOverrides, Dictionary<Guid, Tuple<ChangeKind>> metadata)
+        {
+            EngineeringModelSetup engineeringModelSetup = parameterOverrides.First().Parameter.ContainerElementDefinition.ContainerIteration.ContainerEngineeringModel.EngineeringModelSetup;
+
+            // We assume the list is not empty
+            var text = String.Format("#### {0} {1} – Parameter Overrides\n", FormatClassKind(ClassKind.ParameterOverride), engineeringModelSetup.Name);
+            text += "|Domain|Type| Equipment  | Group path | Parameter | StD | OptD | Scale |\n|:---:|:---:|---|:---|:---|:---:|:---:|:---|\n";
+
+            foreach (ParameterOverride parameterOverride in parameterOverrides) {
+                ChangeKind changeKind = metadata[parameterOverride.Iid].Item1;
+                Parameter parameter = parameterOverride.Parameter;
+
+                text += String.Format("|{0}|{11}{1}|* **{2}** ({3})*|`{4}`|**{5}** ({6})|{9}|{10}|{7} ({8})|\n",
+                    parameterOverride.Owner.ShortName,
+                    FormatChangeKind(changeKind),
+                    parameterOverride.ContainerElementUsage.Name,
+                    parameterOverride.ContainerElementUsage.ShortName,
+                    parameter.Group != null ? parameter.GetParameterGroupPath() : " ",
+                    parameter.ParameterType.Name,
+                    parameter.ParameterType.ShortName,
+                    parameter.Scale.Name,
+                    parameter.Scale.ShortName,
+                    parameter.IsStateDependent ? parameter.StateDependence.Name : "",
+                    parameter.IsOptionDependent ? "✓" : "",
+                    parameter.ExpectsOverride ? "" : ":exclamation:"
+                    );
+            }
+
+            SendMessage(text, parameterOverrides.First().Owner);
+        }
+
         public void NotifyElementDefinition(List<ElementDefinition> elementDefinitions, Dictionary<Guid, Tuple<ChangeKind>> metadata)
         {
             EngineeringModelSetup engineeringModelSetup = elementDefinitions[0].ContainerIteration.ContainerEngineeringModel.EngineeringModelSetup;

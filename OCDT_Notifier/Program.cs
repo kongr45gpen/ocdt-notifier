@@ -54,7 +54,8 @@ namespace OCDT_Notifier {
             ClassKind.ElementUsage,
             ClassKind.EngineeringModel,
             ClassKind.Iteration,
-            ClassKind.Parameter
+            ClassKind.Parameter,
+            ClassKind.ParameterOverride
         };
 
         /// <summary>
@@ -329,12 +330,22 @@ namespace OCDT_Notifier {
 
                                 break;
                             }
-                        case ClassKind.Publication: {
-                            foreach (var publication in entry.Value) {
-                                target.NotifyPublication((Publication) publication, metadata);
-                            }
+                        case ClassKind.ParameterOverride: {
+                                // A parameter override (without its value) was edited
+                                List<ParameterOverride> list = entry.Value.ConvertAll(x => (ParameterOverride)x);
 
-                            break;
+                                foreach (var sublist in SplitDomainsOfExpertise(list, u => u.Owner)) {
+                                    target.NotifyParameterOverride(sublist, metadata);
+                                }
+
+                                break;
+                            }
+                        case ClassKind.Publication: {
+                                foreach (var publication in entry.Value) {
+                                    target.NotifyPublication((Publication) publication, metadata);
+                                }
+
+                                break;
                         }
                         case ClassKind.EngineeringModel:
                             break;
