@@ -22,7 +22,7 @@ namespace OCDT_Notifier
 
             // We assume the list is not empty
             var text = String.Format("#### {0} {1} – Parameter values\n", FormatClassKind(ClassKind.ParameterValueSet), engineeringModelSetup.Name);
-            text += "|Domain|Type| Equipment | Parameter | New value | Published |\n|:---:|:---:|-----|:------:|:----|:----|\n";
+            text += "|Domain|Type| Equipment  | Parameter | New value | Published |\n|:---:|:---:|---|:------:|:----|:----|\n";
 
             foreach (ParameterValueSet parameterValueSet in parameterValueSets) {
                 ChangeKind changeKind = metadata[parameterValueSet.Iid].Item1;
@@ -32,15 +32,18 @@ namespace OCDT_Notifier
                 Logger.Trace("Param Element: {}", parameterValueSet.ContainerParameter.ContainerElementDefinition);
                 Logger.Trace("Param Path: {}", parameterValueSet.ContainerParameter.Path);
 
-                text += String.Format("|{0}|{1}|{2}|{3}|**{4}** {5}{6}|{7} {5}|\n",
+                text += String.Format("|{0}|{1}|**{2}** ({10})|**{3}**{9}|**{4}** {5}{6}|{7} {5}|\n",
                     parameterValueSet.DeriveOwner().ShortName,
                     FormatChangeKind(changeKind),
-                    parameterValueSet.ContainerParameter.ContainerElementDefinition.Name + " (" + parameterValueSet.ContainerParameter.ContainerElementDefinition.ShortName + ")",
+                    parameterValueSet.ContainerParameter.ContainerElementDefinition.Name,
                     parameterValueSet.ContainerParameter.ParameterType.Name,
                     parameterValueSet.ActualValue[0],
                     parameterValueSet.DeriveMeasurementScale() != null ? parameterValueSet.DeriveMeasurementScale().ShortName : "",
                     parameterValueSet.ActualState == null ? "" : " (" + parameterValueSet.ActualState.ShortName + ")",
-                    parameterValueSet.Published[0]
+                    parameterValueSet.Published[0],
+                    parameterValueSet.ContainerParameter.GetParameterGroupPath(), // We don't actually show the group. It is shown on the parameter.
+                    parameterValueSet.ActualOption == null ? "" : " (" + parameterValueSet.ActualOption.ShortName + ")",
+                    parameterValueSet.ContainerParameter.ContainerElementDefinition.ShortName
                     );
             }
 
@@ -121,7 +124,7 @@ namespace OCDT_Notifier
                 publication.Domain.Aggregate("", (s, v) => s += ((s == "") ? "" : ", ") + v.ShortName)
             );
 
-            text += "|DOE|Typ.| Element | Parameter | Parameter Path | Published Value | Switch |\n|:---:|:---:|-----|------|----|---|:---:|\n";
+            text += "|DOE|Typ.| Element | Parameter | State | Published Value | Switch |\n|:---:|:---:|-----|------|----|---|:---:|\n";
 
             ThingTreeNode publicationTree = new ThingTreeNode(null);
 
@@ -144,12 +147,12 @@ namespace OCDT_Notifier
                     ParameterValueSet parameterValueSet = (ParameterValueSet)thing;
                     Parameter parameter = parameterValueSet.ContainerParameter;
 
-                    text += String.Format("|{0}|{1}|**{2}**|**{3}**| `{4}` |**{5}** {6}|{7}|\n",
+                    text += String.Format("|{0}|{1}||**{3}**| **{4}** |**{5}** {6}|{7}|\n",
                           parameterValueSet.Owner.ShortName,
                           FormatClassKind(thing),
                           parameter.ContainerElementDefinition.Name,
-                          parameter.ParameterType.Name,
-                          parameterValueSet.Path,
+                          parameter.IsStateDependent ? " " : parameter.ParameterType.Name,
+                          parameterValueSet.ActualState == null ? " " : parameterValueSet.ActualState.Name,
                           parameterValueSet.Published.First(),
                           parameterValueSet.DeriveMeasurementScale().ShortName,
                           parameterValueSet.ValueSwitch
@@ -162,7 +165,7 @@ namespace OCDT_Notifier
                         return;
                     }
 
-                    text += String.Format("|{0}|{1}|**{2}**|**{3}**|State dependence: {4} ({5})|||\n",
+                    text += String.Format("|{0}|{1}||**{3}**|{4} ({5})|||\n",
                           parameter.Owner.ShortName,
                           FormatClassKind(thing),
                           parameter.ContainerElementDefinition.Name,
@@ -173,10 +176,18 @@ namespace OCDT_Notifier
                 } else if (thing.ClassKind == ClassKind.ElementDefinition) {
                     ElementDefinition elementDefinition = (ElementDefinition)thing;
 
-                    text += String.Format("|{0}|{1}|**{2}**|||||\n",
+                    text += String.Format("||||||||\n|{0}|{1}|**{2}**|||||\n",
                           elementDefinition.Owner.ShortName,
                           FormatClassKind(thing),
                           elementDefinition.Name
+                       );
+                } else if (thing.ClassKind == ClassKind.ParameterGroup) {
+                    ParameterGroup parameterGroup = (ParameterGroup)thing;
+
+                    text += String.Format("|{0}|{1}||**{2}**||||\n",
+                          "", // Parameter groups don't have Owners
+                          FormatClassKind(thing),
+                          parameterGroup.Name
                        );
                 } else {
                     Logger.Warn("Found unexpected container {} while traversing tree", thing.ClassKind);
@@ -237,14 +248,18 @@ namespace OCDT_Notifier
         private String FormatClassKind(ClassKind classKind)
         {
             switch(classKind) {
-            case ClassKind.ParameterValueSet:
-                return ":gear:";
-            case ClassKind.ElementDefinition:
-                return ":package:";
-            case ClassKind.ElementUsage:
-                return ":arrow_lower_right: :package:";
-            default:
-                return "";
+                case ClassKind.Parameter:
+                    return ":level_slider:";
+                case ClassKind.ParameterValueSet:
+                    return ":gear:";
+                case ClassKind.ElementDefinition:
+                    return ":package:";
+                case ClassKind.ParameterGroup:
+                    return ":open_file_folder:";
+                case ClassKind.ElementUsage:
+                    return ":arrow_lower_right: :package:";
+                default:
+                    return "";
             }
         }
 

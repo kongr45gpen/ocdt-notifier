@@ -175,6 +175,12 @@ namespace OCDT_Notifier {
                     // Dictionary of complementary data
                     var metadata = new Dictionary<Guid, Tuple<ChangeKind>> ();
 
+                    /// <summary>
+                    /// A list of published <see cref="Parameter"/>s for this update, so that they are not included
+                    /// afterwards.
+                    /// </summary>
+                    SmartSet<Guid> publishedParameters = new SmartSet<Guid>();
+
                     // For every thing...
                     foreach (var changedDomainObject in domainObjectStoreChange.ChangedDomainObjects) {
                         // Some convenience variables
@@ -229,6 +235,11 @@ namespace OCDT_Notifier {
                         // Add the complementary data of the Thing
                         metadata [thing.Iid] = new Tuple<ChangeKind> (changeKind);
 
+                        // Add the published parameters of this publication
+                        if (thing.ClassKind == ClassKind.Publication) {
+                            publishedParameters.AddAll(((Publication)thing).PublishedParameter.Select(p => p.Iid));
+                        }
+
                         // Store some older things
                         if (thing.ClassKind == ClassKind.ElementDefinition || thing.ClassKind == ClassKind.ElementUsage) {
                             olderThings[thing.Iid] = thing.CreateShallowClone();
@@ -253,6 +264,14 @@ namespace OCDT_Notifier {
                                         newSublist = sublist.FindAll (s => {
                                             // The Guid of the corresponding Element Definition
                                             var element = s.ContainerParameter.ContainerElementDefinition.Iid;
+
+                                            // Don't show parameter changes after their publication
+                                            if (s.ActualValue.ContainsSameItemsAs(s.Published)) {
+                                                if (publishedParameters.Contains(s.ContainerParameter.Iid)) {
+                                                    // The parameter has been published; Don't show it.
+                                                    return false;
+                                                }
+                                            }
 
                                             if (!metadata.ContainsKey (element)) return true;
                                             // Don't show parameters that correspond to a new or a deleted element
@@ -286,7 +305,7 @@ namespace OCDT_Notifier {
                                 }
 
                                 break;
-                                }
+                            }
                         case ClassKind.Publication: {
                                 foreach (var publication in entry.Value) {
                                     target.NotifyPublication((Publication) publication, metadata);
